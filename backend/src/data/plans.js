@@ -1,31 +1,69 @@
+/** v1.4 approved PKR subscription plans */
 export const SUBSCRIPTION_PLANS = [
   {
-    id: "single",
-    name: "Single person",
-    persons: 1,
+    id: "basic",
+    name: "Basic Plan",
     pricePkr: 999,
-    billing: "monthly"
+    priceMonthly: 999,
+    currencyCode: "PKR",
+    userLimit: 1,
+    billing: "monthly",
+    isRecommended: false,
+    requestCustom: false,
+    features: [
+      "1 owner account",
+      "Manage bookings",
+      "Customer management",
+      "Basic reports",
+      "Email support"
+    ]
   },
   {
-    id: "team-3",
-    name: "Up to 3 persons",
-    persons: 3,
+    id: "standard",
+    name: "Standard Plan",
     pricePkr: 1799,
-    billing: "monthly"
+    priceMonthly: 1799,
+    currencyCode: "PKR",
+    userLimit: 3,
+    billing: "monthly",
+    isRecommended: true,
+    requestCustom: false,
+    features: [
+      "Up to 3 persons total",
+      "Add Manager or Waiter Head",
+      "Team collaboration",
+      "Advanced reports",
+      "Priority support"
+    ]
   },
   {
-    id: "team-6",
-    name: "Up to 6 persons",
-    persons: 6,
+    id: "premium",
+    name: "Premium Plan",
     pricePkr: 2500,
-    billing: "monthly"
+    priceMonthly: 2500,
+    currencyCode: "PKR",
+    userLimit: 6,
+    billing: "monthly",
+    isRecommended: false,
+    requestCustom: false,
+    features: [
+      "Up to 6 persons total",
+      "Multiple team members",
+      "Role permissions",
+      "Advanced analytics",
+      "Dedicated support"
+    ]
   },
   {
     id: "custom",
-    name: "Custom plan",
-    persons: null,
+    name: "Custom Plan",
     pricePkr: null,
+    priceMonthly: null,
+    currencyCode: "PKR",
+    userLimit: null,
     billing: "custom",
-    requestCustom: true
+    isRecommended: false,
+    requestCustom: true,
+    features: ["For teams above 6 persons", "Custom pricing", "Admin review"]
   }
 ];

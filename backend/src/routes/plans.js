@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { SUBSCRIPTION_PLANS } from "../data/plans.js";
+import { db } from "../db/store.js";
 
 export const plansRouter = Router();
 
-plansRouter.get("/", (_req, res) => {
-  res.json({ plans: SUBSCRIPTION_PLANS });
+plansRouter.get("/", (req, res) => {
+  const currency = req.query.currency || "PKR";
+  res.json({ plans: db.getPlans(currency) });
 });

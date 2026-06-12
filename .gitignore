@@ -30,4 +30,5 @@ mobile-app/.packages
 
 # Data (runtime only — not source)
 /data/
+backend/data/runtime/
 *.db

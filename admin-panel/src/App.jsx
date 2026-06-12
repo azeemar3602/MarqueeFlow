@@ -1,73 +1,63 @@
-import { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import Layout from "./components/Layout.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
+import BusinessesPage from "./pages/BusinessesPage.jsx";
+import PlansPage from "./pages/PlansPage.jsx";
+import CustomPlansPage from "./pages/CustomPlansPage.jsx";
+import BookingsPage from "./pages/BookingsPage.jsx";
+import CalendarPage from "./pages/CalendarPage.jsx";
+import CustomersPage from "./pages/CustomersPage.jsx";
+import PackagesPage from "./pages/PackagesPage.jsx";
+import PaymentsPage from "./pages/PaymentsPage.jsx";
+import TeamPage from "./pages/TeamPage.jsx";
+import NotificationsPage from "./pages/NotificationsPage.jsx";
+import ReportsPage from "./pages/ReportsPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4010";
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="login-page"><p>Loading...</p></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="businesses" element={<BusinessesPage />} />
+        <Route path="plans" element={<PlansPage />} />
+        <Route path="custom-plans" element={<CustomPlansPage />} />
+        <Route path="bookings" element={<BookingsPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
+        <Route path="customers" element={<CustomersPage />} />
+        <Route path="packages" element={<PackagesPage />} />
+        <Route path="payments" element={<PaymentsPage />} />
+        <Route path="team" element={<TeamPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
-  const [health, setHealth] = useState(null);
-  const [plans, setPlans] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [healthRes, plansRes, rolesRes] = await Promise.all([
-          fetch(`${API_BASE}/api/health`),
-          fetch(`${API_BASE}/api/plans`),
-          fetch(`${API_BASE}/api/roles`)
-        ]);
-        setHealth(await healthRes.json());
-        setPlans((await plansRes.json()).plans || []);
-        setRoles((await rolesRes.json()).roles || []);
-      } catch (err) {
-        setError(err.message || "Failed to reach API");
-      }
-    }
-    load();
-  }, []);
-
   return (
-    <div className="page">
-      <header className="hero">
-        <p className="eyebrow">MarqueeFlow</p>
-        <h1>Admin Control Panel</h1>
-        <p>Manage plans, users, managers, waiters, bookings, slots, pricing, and business settings.</p>
-      </header>
-
-      <section className="card">
-        <h2>API Status</h2>
-        {error ? <p className="error">{error}</p> : null}
-        {health ? (
-          <pre>{JSON.stringify(health, null, 2)}</pre>
-        ) : (
-          <p>Checking API...</p>
-        )}
-      </section>
-
-      <section className="grid">
-        <article className="card">
-          <h2>Subscription Plans (PKR)</h2>
-          <ul>
-            {plans.map((plan) => (
-              <li key={plan.id}>
-                <strong>{plan.name}</strong>
-                {plan.requestCustom
-                  ? " — Request custom plan"
-                  : ` — PKR ${plan.pricePkr}/month`}
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="card">
-          <h2>Roles</h2>
-          <ul>
-            {roles.map((role) => (
-              <li key={role.id}>{role.label}</li>
-            ))}
-          </ul>
-        </article>
-      </section>
-    </div>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
