@@ -28,6 +28,6 @@ mobile-app/.flutter-plugins
 mobile-app/.flutter-plugins-dependencies
 mobile-app/.packages
 
-# Data
-data/
+# Data (runtime only — not source)
+/data/
 *.db
