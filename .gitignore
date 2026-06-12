@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pub-cache/
+.dart_tool/
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Flutter
+mobile-app/.flutter-plugins
+mobile-app/.flutter-plugins-dependencies
+mobile-app/.packages
+
+# Data
+data/
+*.db
