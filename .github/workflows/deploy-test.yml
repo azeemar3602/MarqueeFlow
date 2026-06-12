@@ -25,7 +25,8 @@ jobs:
             git checkout test
             git pull origin test
             cd backend && npm ci && npm run build
-            cd ../admin-panel && npm ci && npm run build
+            cd ../admin-panel && npm ci && VITE_API_BASE_URL=https://api.marqueeflow.com npm run build
+            cd ..
             pm2 reload marqueeflow-backend --update-env
             curl -fsS http://127.0.0.1:4010/api/health
             test -f admin-panel/dist/index.html
