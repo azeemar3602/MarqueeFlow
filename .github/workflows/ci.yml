@@ -1,10 +1,16 @@
+# CI — validates backend, admin panel, and Flutter on every push (test + main) and on PRs.
 name: CI
 
 on:
-  pull_request:
-    branches: [main, test]
   push:
-    branches: [test]
+    branches:
+      - test
+      - main # production branch (GitHub remote is lowercase "main", not "MAIN")
+  pull_request:
+    branches:
+      - test
+      - main
+  workflow_dispatch:
 
 jobs:
   deployment-safety:
@@ -30,7 +36,7 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
       - run: npm test
       - run: npm run build
@@ -47,7 +53,7 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: admin-panel/package-lock.json
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
       - run: npm run build
 
@@ -65,9 +71,8 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-  pr-to-main-gate:
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+  ci-gate:
     needs: [deployment-safety, backend, admin-panel, flutter]
     runs-on: ubuntu-latest
     steps:
-      - run: echo "All checks passed for PR to main"
+      - run: echo "All CI checks passed."

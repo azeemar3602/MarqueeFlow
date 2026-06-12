@@ -1,0 +1,67 @@
+# Deploy to KVM — manual staging/production deploy with isolated paths and PM2 processes.
+name: Deploy to KVM
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Resolve deploy targets
+        id: targets
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "git_branch=test" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=${{ vars.MARQUEEFLOW_STAGING_DEPLOY_PATH || '/var/www/marqueeflow-staging' }}" >> "$GITHUB_OUTPUT"
+            echo "pm2_name=${{ vars.MARQUEEFLOW_STAGING_PM2_NAME || 'marqueeflow-backend-staging' }}" >> "$GITHUB_OUTPUT"
+            echo "ecosystem_file=ecosystem.staging.config.cjs" >> "$GITHUB_OUTPUT"
+            echo "health_port=${{ vars.MARQUEEFLOW_STAGING_PORT || '4012' }}" >> "$GITHUB_OUTPUT"
+            echo "vite_api=${{ vars.MARQUEEFLOW_STAGING_API_URL || 'https://api-staging.marqueeflow.com' }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "git_branch=main" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=${{ vars.MARQUEEFLOW_PRODUCTION_DEPLOY_PATH || '/var/www/marqueeflow' }}" >> "$GITHUB_OUTPUT"
+            echo "pm2_name=${{ vars.MARQUEEFLOW_PRODUCTION_PM2_NAME || 'marqueeflow-backend' }}" >> "$GITHUB_OUTPUT"
+            echo "ecosystem_file=ecosystem.config.cjs" >> "$GITHUB_OUTPUT"
+            echo "health_port=${{ vars.MARQUEEFLOW_PRODUCTION_PORT || '4010' }}" >> "$GITHUB_OUTPUT"
+            echo "vite_api=${{ vars.MARQUEEFLOW_PRODUCTION_API_URL || 'https://api.marqueeflow.com' }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy MarqueeFlow to KVM (MarqueeFlow paths/PM2 only)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_SSH_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            export DEPLOY_PATH="${{ steps.targets.outputs.deploy_path }}"
+            export GIT_BRANCH="${{ steps.targets.outputs.git_branch }}"
+            export PM2_APP_NAME="${{ steps.targets.outputs.pm2_name }}"
+            export ECOSYSTEM_FILE="${{ steps.targets.outputs.ecosystem_file }}"
+            export VITE_API_BASE_URL="${{ steps.targets.outputs.vite_api }}"
+            export HEALTH_PORT="${{ steps.targets.outputs.health_port }}"
+            export REPO_URL="https://github.com/${{ github.repository }}.git"
+            mkdir -p /var/log/marqueeflow
+            if [ ! -d "${DEPLOY_PATH}/.git" ]; then
+              mkdir -p "$(dirname "${DEPLOY_PATH}")"
+              git clone --branch "${GIT_BRANCH}" "${REPO_URL}" "${DEPLOY_PATH}"
+            fi
+            cd "${DEPLOY_PATH}"
+            # Ensure deploy script exists (first run after CI/CD upgrade on existing production tree)
+            if [ ! -f deploy/scripts/deploy-marqueeflow.sh ]; then
+              git fetch origin "${GIT_BRANCH}"
+              git checkout "${GIT_BRANCH}"
+              git pull --ff-only origin "${GIT_BRANCH}"
+            fi
+            bash deploy/scripts/deploy-marqueeflow.sh

@@ -1,0 +1,57 @@
+# Mobile APK Build — Flutter release APK as a downloadable artifact.
+name: Mobile APK Build
+
+on:
+  push:
+    branches:
+      - test
+      - main
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: Optional API_BASE_URL dart-define override
+        required: false
+        type: string
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve API base URL
+        id: api
+        run: |
+          if [ -n "${{ github.event.inputs.api_base_url }}" ]; then
+            echo "url=${{ github.event.inputs.api_base_url }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "test" ]; then
+            echo "url=${{ vars.MARQUEEFLOW_STAGING_API_URL || 'https://api-staging.marqueeflow.com' }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${{ vars.MARQUEEFLOW_PRODUCTION_API_URL || 'https://api.marqueeflow.com' }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Prepare Android platform and dependencies
+        working-directory: mobile-app
+        run: |
+          flutter pub get
+          if [ ! -d android ]; then
+            flutter create --platforms=android .
+          fi
+
+      - name: Build release APK
+        working-directory: mobile-app
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE_URL=${{ steps.api.outputs.url }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqueeflow-apk-${{ github.ref_name }}-${{ github.run_number }}
+          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
