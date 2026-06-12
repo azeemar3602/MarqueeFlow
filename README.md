@@ -31,7 +31,7 @@ cd mobile-app && flutter pub get && flutter run
 ## VPS paths
 
 - Deploy root: `/var/www/marqueeflow`
-- PM2: `marqueeflow-backend`, `marqueeflow-admin`
+- PM2: `marqueeflow-backend` (admin static via Nginx)
 - Logs: `/var/log/marqueeflow/`
 
 ## GitHub Secrets

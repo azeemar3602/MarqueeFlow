@@ -3,8 +3,8 @@
 ## VPS (isolated)
 
 - Path: `/var/www/marqueeflow`
-- PM2: `marqueeflow-backend`, `marqueeflow-admin`
-- Ports: `4010` (API), `4011` (admin preview)
+- PM2: `marqueeflow-backend` only (admin is static via Nginx)
+- Ports: `4010` (API); admin served from `admin-panel/dist`
 - Logs: `/var/log/marqueeflow/`
 - Nginx: new files only under `/etc/nginx/sites-available/`
 

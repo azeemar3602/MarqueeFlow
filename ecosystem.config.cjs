@@ -14,20 +14,6 @@ module.exports = {
       },
       error_file: "/var/log/marqueeflow/backend-error.log",
       out_file: "/var/log/marqueeflow/backend-out.log"
-    },
-    {
-      name: "marqueeflow-admin",
-      cwd: "/var/www/marqueeflow/admin-panel",
-      script: "npm",
-      args: "run start",
-      instances: 1,
-      autorestart: true,
-      max_memory_restart: "200M",
-      env: {
-        NODE_ENV: "production"
-      },
-      error_file: "/var/log/marqueeflow/admin-error.log",
-      out_file: "/var/log/marqueeflow/admin-out.log"
     }
   ]
 };

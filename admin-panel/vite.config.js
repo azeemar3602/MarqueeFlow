@@ -8,6 +8,7 @@ export default defineConfig({
   },
   preview: {
     port: 4011,
-    host: "127.0.0.1"
+    host: "127.0.0.1",
+    allowedHosts: ["admin.marqueeflow.com", "127.0.0.1", "localhost"]
   }
 });

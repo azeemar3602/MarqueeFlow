@@ -28,7 +28,6 @@ jobs:
             cd backend && npm ci && npm run build
             cd ../admin-panel && npm ci && npm run build
             pm2 reload marqueeflow-backend --update-env || pm2 start ecosystem.config.cjs --only marqueeflow-backend
-            pm2 reload marqueeflow-admin --update-env || pm2 start ecosystem.config.cjs --only marqueeflow-admin
             pm2 save
             curl -fsS http://127.0.0.1:4010/api/health
-            curl -fsS http://127.0.0.1:4011/ >/dev/null
+            test -f admin-panel/dist/index.html
