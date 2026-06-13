@@ -31,5 +31,4 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/icon/app_icon.png
+  # Launcher icon source only — not bundled in APK (saves ~1.2 MB); icons live in android/res.

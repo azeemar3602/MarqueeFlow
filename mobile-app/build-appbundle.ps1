@@ -11,9 +11,7 @@ if (Test-Path $androidHome) {
   $env:Path = "$env:Path;$androidHome\platform-tools;$androidHome\cmdline-tools\latest\bin"
 }
 flutter pub get
-dart run flutter_launcher_icons
-# Per-ABI release APKs (~16–20 MB each). Do not distribute the debug APK (~148 MB).
-flutter build apk --release --split-per-abi --dart-define=API_BASE_URL=https://api.marqueeflow.com
+flutter build appbundle --release --dart-define=API_BASE_URL=https://api.marqueeflow.com
 Write-Host ""
-Write-Host "Release APKs (install arm64 on modern devices):"
-Get-ChildItem "build\app\outputs\flutter-apk\app-*-release.apk" | ForEach-Object { Write-Host "  $($_.Name)  $([math]::Round($_.Length/1MB,2)) MB" }
+Write-Host "Play Store bundle:"
+Get-Item "build\app\outputs\bundle\release\app-release.aab" | ForEach-Object { Write-Host "  $($_.Name)  $([math]::Round($_.Length/1MB,2)) MB" }

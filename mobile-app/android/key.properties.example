@@ -1,0 +1,5 @@
+# Copy to key.properties (gitignored) for release signing.
+# storePassword=your-store-password
+# keyPassword=your-key-password
+# keyAlias=marqueeflow
+# storeFile=../keystore/marqueeflow-release.jks
