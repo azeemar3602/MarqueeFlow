@@ -9,6 +9,9 @@
     "dev": "node --watch src/server.js",
     "lint": "eslint src --max-warnings 0",
     "test": "node --test test/**/*.test.js",
+    "seed:demo": "node scripts/seed-demo-account.js",
+    "seed:admin": "node scripts/seed-super-admin.js",
+    "seed:phase3": "node scripts/seed-phase3-qa.js",
     "build": "node -e \"console.log('backend ready')\""
   },
   "engines": {

@@ -30,9 +30,40 @@ function emptyStore() {
     packages: [],
     bookings: [],
     payments: [],
+    subscriptionPayments: [],
     notifications: [],
-    auditLogs: []
+    auditLogs: [],
+    adminUsers: [],
+    demoRequests: [],
+    settings: {
+      appName: "MarqueeFlow",
+      currencyCode: "PKR",
+      trialDays: 14,
+      manualApprovalEnabled: true,
+      supportPhone: "",
+      supportEmail: ""
+    }
   };
+}
+
+function ensureStoreShape() {
+  if (!store.adminUsers) store.adminUsers = [];
+  if (!store.subscriptionPayments) store.subscriptionPayments = [];
+  if (!store.auditLogs) store.auditLogs = [];
+  if (!store.demoRequests) store.demoRequests = [];
+  if (!store.settings) {
+    store.settings = {
+      appName: "MarqueeFlow",
+      currencyCode: "PKR",
+      trialDays: 14,
+      manualApprovalEnabled: true,
+      supportPhone: "",
+      supportEmail: ""
+    };
+  }
+  for (const biz of store.businesses) {
+    if (!biz.approvalStatus) biz.approvalStatus = "approved";
+  }
 }
 
 function ensureDataDir() {
@@ -57,6 +88,7 @@ function saveStore(store) {
 }
 
 let store = loadStore();
+ensureStoreShape();
 
 function persist() {
   saveStore(store);
@@ -96,6 +128,65 @@ function getUserLimit(businessId) {
   if (!sub) return 0;
   const plan = getPlan(sub.planId);
   return plan?.userLimit ?? 0;
+}
+
+function getSubscriptionStatus(businessId) {
+  const sub = getSubscription(businessId);
+  if (!sub) {
+    return { status: "none", planId: null, plan: null, trialEnd: null, memberLimit: 0, membersUsed: teamUsage(businessId) };
+  }
+  const plan = getPlan(sub.planId);
+  const now = Date.now();
+  let status = sub.status;
+  if (sub.trialEnd && new Date(sub.trialEnd).getTime() < now && status === "trial") {
+    status = "expired";
+  }
+  if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd).getTime() < now && status === "active") {
+    status = "expired";
+  }
+  return {
+    status,
+    planId: sub.planId,
+    plan,
+    trialStart: sub.trialStart,
+    trialEnd: sub.trialEnd,
+    currentPeriodStart: sub.currentPeriodStart,
+    periodEnd: sub.currentPeriodEnd,
+    memberLimit: plan?.userLimit ?? 0,
+    membersUsed: teamUsage(businessId)
+  };
+}
+
+function getMarqueeIssues(businessId) {
+  const issues = [];
+  const business = getBusiness(businessId);
+  const sub = getSubscription(businessId);
+  if (!business) return issues;
+  if (business.approvalStatus === "pending") {
+    issues.push({ id: `${businessId}-approval`, type: "approval", message: "Business pending Super Admin approval", severity: "high", status: "open" });
+  }
+  if (business.approvalStatus === "rejected") {
+    issues.push({ id: `${businessId}-rejected`, type: "approval", message: "Business registration rejected", severity: "high", status: "open" });
+  }
+  if (business.status === "suspended") {
+    issues.push({ id: `${businessId}-suspended`, type: "account", message: "Business account suspended", severity: "high", status: "open" });
+  }
+  if (sub?.status === "expired") {
+    issues.push({ id: `${businessId}-expired`, type: "subscription", message: "Subscription expired", severity: "medium", status: "open" });
+  }
+  const pendingSubPay = store.subscriptionPayments.filter(
+    (p) => p.businessId === businessId && p.status === "pending"
+  ).length;
+  if (pendingSubPay > 0) {
+    issues.push({ id: `${businessId}-subpay`, type: "payment", message: `${pendingSubPay} pending subscription payment(s)`, severity: "medium", status: "open" });
+  }
+  const pendingBookingPay = store.bookings.filter(
+    (b) => b.businessId === businessId && b.paymentStatus !== "fully_paid"
+  ).length;
+  if (pendingBookingPay > 0) {
+    issues.push({ id: `${businessId}-bookingpay`, type: "payment", message: `${pendingBookingPay} booking(s) with pending payment`, severity: "low", status: "open" });
+  }
+  return issues;
 }
 
 function ensureSlotsForMonth(businessId, month) {
@@ -167,6 +258,7 @@ export const db = {
       currencyCode: "PKR",
       subscriptionPlanId: null,
       status: "active",
+      approvalStatus: store.settings?.manualApprovalEnabled ? "pending" : "approved",
       createdAt: new Date().toISOString()
     };
     store.users.push(user);
@@ -234,28 +326,7 @@ export const db = {
   },
 
   getSubscriptionStatus(businessId) {
-    const sub = getSubscription(businessId);
-    if (!sub) {
-      return { status: "none", planId: null, plan: null, trialEnd: null, memberLimit: 0, membersUsed: teamUsage(businessId) };
-    }
-    const plan = getPlan(sub.planId);
-    const now = Date.now();
-    let status = sub.status;
-    if (sub.trialEnd && new Date(sub.trialEnd).getTime() < now && status === "trial") {
-      status = "expired";
-    }
-    if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd).getTime() < now && status === "active") {
-      status = "expired";
-    }
-    return {
-      status,
-      planId: sub.planId,
-      plan,
-      trialEnd: sub.trialEnd,
-      periodEnd: sub.currentPeriodEnd,
-      memberLimit: plan?.userLimit ?? 0,
-      membersUsed: teamUsage(businessId)
-    };
+    return getSubscriptionStatus(businessId);
   },
 
   createCustomPlanRequest({ businessId, requestedTeamSize, contactName, phone, note }) {
@@ -294,8 +365,23 @@ export const db = {
       .filter((m) => m.businessId === businessId)
       .map((m) => {
         const user = findUserById(m.userId);
-        return { ...m, name: user?.name, phone: user?.phone };
+        return { ...m, name: user?.name, phone: user?.phone, permissions: m.permissionsJson };
       });
+  },
+
+  updateTeamMember(id, businessId, patch = {}) {
+    const member = store.teamMembers.find((m) => m.id === id && m.businessId === businessId);
+    if (!member) return null;
+    if (patch.role) member.role = patch.role;
+    if (patch.permissions) member.permissionsJson = patch.permissions;
+    if (patch.status) {
+      member.status = patch.status;
+      const user = findUserById(member.userId);
+      if (user && patch.status === "inactive") user.status = "inactive";
+    }
+    persist();
+    const user = findUserById(member.userId);
+    return { ...member, name: user?.name, phone: user?.phone, permissions: member.permissionsJson };
   },
 
   getTeamUsage(businessId) {
@@ -396,16 +482,84 @@ export const db = {
     return user;
   },
 
-  listPackages(businessId) {
-    return store.packages.filter((p) => p.businessId === businessId && p.status === "active");
+  listPackages(businessId, { includeInactive = false } = {}) {
+    let list = store.packages.filter((p) => p.businessId === businessId);
+    if (!includeInactive) list = list.filter((p) => p.status === "active");
+    return list;
+  },
+
+  createPackage(businessId, payload) {
+    if (!payload.name || payload.price == null) {
+      const err = new Error("Package name and price are required");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    const services = payload.includedServices || payload.inclusionsJson || [];
+    const pkg = {
+      id: newId(),
+      businessId,
+      name: payload.name,
+      price: Number(payload.price),
+      guestLimit: Number(payload.guestLimit || 0),
+      description: payload.description || "",
+      includedServices: services,
+      inclusionsJson: services,
+      status: payload.status || "active",
+      createdAt: new Date().toISOString()
+    };
+    store.packages.push(pkg);
+    persist();
+    return pkg;
+  },
+
+  updatePackage(id, businessId, patch) {
+    const pkg = store.packages.find((p) => p.id === id && p.businessId === businessId);
+    if (!pkg) return null;
+    if (patch.name != null) pkg.name = patch.name;
+    if (patch.price != null) pkg.price = Number(patch.price);
+    if (patch.guestLimit != null) pkg.guestLimit = Number(patch.guestLimit);
+    if (patch.description != null) pkg.description = patch.description;
+    if (patch.includedServices != null) {
+      pkg.includedServices = patch.includedServices;
+      pkg.inclusionsJson = patch.includedServices;
+    }
+    if (patch.status != null) pkg.status = patch.status;
+    persist();
+    return pkg;
+  },
+
+  deactivatePackage(id, businessId) {
+    const pkg = store.packages.find((p) => p.id === id && p.businessId === businessId);
+    if (!pkg) return null;
+    const activeBooking = store.bookings.some(
+      (b) => b.packageId === id && b.businessId === businessId && b.status !== "cancelled"
+    );
+    if (activeBooking) {
+      const err = new Error("Package is linked to active bookings. Deactivate instead of delete.");
+      err.code = "PACKAGE_IN_USE";
+      throw err;
+    }
+    pkg.status = "inactive";
+    persist();
+    return pkg;
+  },
+
+  getTeamMember(businessId, userId) {
+    return store.teamMembers.find(
+      (m) => m.businessId === businessId && m.userId === userId && m.status === "active"
+    );
+  },
+
+  getMarqueeIssues(businessId) {
+    return getMarqueeIssues(businessId);
   },
 
   seedPackagesIfEmpty(businessId) {
     if (store.packages.some((p) => p.businessId === businessId)) return;
     const defaults = [
-      { name: "Silver Package", price: 150000, inclusions: ["Hall", "Basic decor", "Tea"] },
-      { name: "Gold Package", price: 250000, inclusions: ["Hall", "Premium decor", "Dinner"] },
-      { name: "Platinum Package", price: 400000, inclusions: ["Full venue", "Luxury decor", "Full catering"] }
+      { name: "Silver Package", price: 150000, guestLimit: 150, description: "Hall with basic decor", inclusions: ["Hall", "Basic decor", "Tea"] },
+      { name: "Gold Package", price: 250000, guestLimit: 300, description: "Premium hall experience", inclusions: ["Hall", "Premium decor", "Dinner"] },
+      { name: "Platinum Package", price: 400000, guestLimit: 500, description: "Full venue package", inclusions: ["Full venue", "Luxury decor", "Full catering"] }
     ];
     for (const pkg of defaults) {
       store.packages.push({
@@ -413,6 +567,9 @@ export const db = {
         businessId,
         name: pkg.name,
         price: pkg.price,
+        guestLimit: pkg.guestLimit,
+        description: pkg.description,
+        includedServices: pkg.inclusions,
         inclusionsJson: pkg.inclusions,
         status: "active"
       });
@@ -466,6 +623,47 @@ export const db = {
       status = "pending",
       notes = ""
     } = payload;
+
+    if (!packageId) {
+      const err = new Error("Package is required");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    const pkg = store.packages.find((p) => p.id === packageId && p.businessId === businessId);
+    if (!pkg) {
+      const err = new Error("Package not found");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    if (pkg.status === "inactive") {
+      const err = new Error("Selected package is inactive");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    const guests = Number(guestCount);
+    if (!guests || guests < 1) {
+      const err = new Error("Guest count must be at least 1");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    if (pkg.guestLimit && guests > pkg.guestLimit) {
+      const err = new Error(`Guest count exceeds package limit of ${pkg.guestLimit}`);
+      err.code = "VALIDATION";
+      throw err;
+    }
+    const total = pkg.price || 0;
+    const advance = Math.max(0, Math.min(Number(advancePayment) || 0, total));
+    if (Number(advancePayment) < 0) {
+      const err = new Error("Advance payment cannot be negative");
+      err.code = "VALIDATION";
+      throw err;
+    }
+    if (Number(advancePayment) > total) {
+      const err = new Error("Advance payment cannot exceed package total");
+      err.code = "VALIDATION";
+      throw err;
+    }
+
     let customer = store.customers.find(
       (c) => c.businessId === businessId && c.phone === customerPhone
     );
@@ -473,24 +671,30 @@ export const db = {
       customer = { id: newId(), businessId, name: customerName, phone: customerPhone, notes: "" };
       store.customers.push(customer);
     }
-    const pkg = store.packages.find((p) => p.id === packageId);
-    const total = pkg?.price || 0;
-    const advance = Math.min(advancePayment, total);
     const remaining = Math.max(total - advance, 0);
     let paymentStatus = "unpaid";
     if (advance > 0 && remaining > 0) paymentStatus = "advance_paid";
     if (advance > 0 && remaining === 0) paymentStatus = "fully_paid";
 
-    const slot = store.slots.find((s) => s.id === slotId);
-    if (slot) {
-      if (slot.bookedCount >= slot.capacity && slot.status !== "blocked") {
-        const err = new Error("Slot is fully booked");
-        err.code = "SLOT_FULL";
-        throw err;
-      }
-      slot.bookedCount += 1;
-      refreshSlotStatus(slot);
+    const slot = store.slots.find((s) => s.id === slotId && s.businessId === businessId);
+    if (!slot) {
+      const err = new Error("Slot not found");
+      err.code = "VALIDATION";
+      throw err;
     }
+    refreshSlotStatus(slot);
+    if (slot.status === "blocked") {
+      const err = new Error("Slot is blocked");
+      err.code = "SLOT_FULL";
+      throw err;
+    }
+    if (slot.bookedCount >= slot.capacity) {
+      const err = new Error("Slot is fully booked");
+      err.code = "SLOT_FULL";
+      throw err;
+    }
+    slot.bookedCount += 1;
+    refreshSlotStatus(slot);
 
     const booking = {
       id: newId(),
@@ -500,8 +704,8 @@ export const db = {
       eventDate,
       slotId,
       eventType,
-      guestCount,
-      packageId: packageId || null,
+      guestCount: guests,
+      packageId,
       status,
       notes,
       advancePaid: advance,
@@ -571,14 +775,27 @@ export const db = {
     const payments = store.payments.filter((p) => p.businessId === businessId && p.paymentStatus === "recorded");
     const bookings = store.bookings.filter((b) => b.businessId === businessId);
     const totalReceived = payments.reduce((s, p) => s + p.amount, 0);
-    const pending = bookings.filter((b) => b.paymentStatus === "unpaid" || b.paymentStatus === "advance_paid").length;
-    const partial = bookings.filter((b) => b.paymentStatus === "partially_paid" || b.paymentStatus === "advance_paid").length;
-    return { totalReceived, pendingCount: pending, partialCount: partial, currencyCode: "PKR" };
+    const pendingAmount = bookings
+      .filter((b) => b.paymentStatus !== "fully_paid")
+      .reduce((s, b) => s + (b.remainingAmount || 0), 0);
+    const partialCount = bookings.filter((b) => b.paymentStatus === "partially_paid" || b.paymentStatus === "advance_paid").length;
+    const fullyPaidCount = bookings.filter((b) => b.paymentStatus === "fully_paid").length;
+    return {
+      totalReceived,
+      pendingAmount,
+      pendingCount: bookings.filter((b) => b.paymentStatus !== "fully_paid").length,
+      partialCount,
+      fullyPaidCount,
+      currencyCode: "PKR"
+    };
   },
 
-  listPayments(businessId) {
-    return store.payments
-      .filter((p) => p.businessId === businessId)
+  listPayments(businessId, filters = {}) {
+    let list = store.payments.filter((p) => p.businessId === businessId);
+    if (filters.date) {
+      list = list.filter((p) => p.paymentDate === filters.date);
+    }
+    return list
       .map((p) => {
         const booking = store.bookings.find((b) => b.id === p.bookingId);
         return { ...p, bookingCode: booking?.bookingCode, customerName: booking?.customerName };
@@ -626,17 +843,23 @@ export const db = {
     const month = today.slice(0, 7);
     ensureSlotsForMonth(businessId, month);
     const availableSlots = store.slots.filter(
-      (s) => s.businessId === businessId && s.date >= today && s.status === "available"
+      (s) => s.businessId === businessId && s.date === today && s.bookedCount < s.capacity
     ).length;
+    const business = getBusiness(businessId);
+    const owner = findUserById(business?.ownerId);
     return {
-      greetingName: getBusiness(businessId)?.businessName || "MarqueeFlow",
+      greetingName: owner?.name || business?.businessName || "MarqueeFlow",
       date: today,
-      todayBookings: todayBookings.length,
-      upcomingEvents: upcoming.length,
-      availableSlots,
+      todayCount: todayBookings.length,
+      upcomingCount: upcoming.length,
+      availableSlotsToday: availableSlots,
       totalBookings: bookings.length,
       pendingBookings: bookings.filter((b) => b.status === "pending").length,
       confirmedBookings: bookings.filter((b) => b.status === "confirmed").length,
+      pendingPayments: bookings.filter((b) => b.paymentStatus !== "fully_paid").length,
+      todayBookings: todayBookings.length,
+      upcomingEvents: upcoming.length,
+      availableSlots,
       paymentPending: bookings.filter((b) => b.paymentStatus !== "fully_paid").length,
       upcoming
     };
@@ -658,5 +881,358 @@ export const db = {
   getBusiness,
   listBusinesses() {
     return store.businesses;
+  },
+
+  findAdminByPhone(phone) {
+    return store.adminUsers.find((a) => a.phone === phone);
+  },
+
+  findAdminById(id) {
+    return store.adminUsers.find((a) => a.id === id);
+  },
+
+  createAdminUser({ name, phone, passwordHash, role = "super_admin" }) {
+    const admin = {
+      id: newId(),
+      name,
+      phone,
+      passwordHash,
+      role,
+      status: "active",
+      lastLoginAt: null,
+      createdAt: new Date().toISOString()
+    };
+    store.adminUsers.push(admin);
+    persist();
+    return admin;
+  },
+
+  listAdminUsers() {
+    return store.adminUsers.map(({ passwordHash, ...a }) => a);
+  },
+
+  addAuditLog({ adminId, adminName, action, module, targetId, oldValue, newValue }) {
+    const log = {
+      id: newId(),
+      adminId,
+      adminName,
+      action,
+      module,
+      targetId: targetId || null,
+      oldValue: oldValue || null,
+      newValue: newValue || null,
+      createdAt: new Date().toISOString()
+    };
+    store.auditLogs.unshift(log);
+    if (store.auditLogs.length > 500) store.auditLogs.length = 500;
+    persist();
+    return log;
+  },
+
+  listAuditLogs() {
+    return store.auditLogs;
+  },
+
+  getPlatformDashboard() {
+    const businesses = store.businesses;
+    const subs = store.businessSubscriptions;
+    const active = subs.filter((s) => s.status === "active").length;
+    const expired = subs.filter((s) => s.status === "expired").length;
+    const trial = subs.filter((s) => s.status === "trial").length;
+    const pendingApprovals = businesses.filter((b) => b.approvalStatus === "pending").length;
+    const suspended = businesses.filter((b) => b.approvalStatus === "suspended" || b.status === "suspended").length;
+    const customRequests = store.customPlanRequests.filter((r) => r.status === "pending" || r.status === "new").length;
+    const monthlyRevenue = store.subscriptionPayments
+      .filter((p) => p.status === "confirmed" && p.paymentDate?.startsWith(new Date().toISOString().slice(0, 7)))
+      .reduce((s, p) => s + p.amount, 0);
+    const pendingPayments = store.subscriptionPayments.filter((p) => p.status === "pending").length;
+    return {
+      totalMarquees: businesses.length,
+      activeSubscriptions: active,
+      expiredSubscriptions: expired,
+      trialBusinesses: trial,
+      pendingApprovals,
+      suspendedBusinesses: suspended,
+      customPlanRequests: customRequests,
+      monthlyRevenuePKR: monthlyRevenue,
+      pendingSubscriptionPayments: pendingPayments,
+      pendingActions: [
+        { label: "Pending approvals", count: pendingApprovals },
+        { label: "Pending subscription payments", count: pendingPayments },
+        { label: "Custom plan requests", count: customRequests }
+      ].filter((a) => a.count > 0),
+      recentActivity: store.auditLogs.slice(0, 8),
+      upcomingRenewals: subs
+        .filter((s) => s.currentPeriodEnd)
+        .slice(0, 5)
+        .map((s) => {
+          const biz = getBusiness(s.businessId);
+          return { businessId: s.businessId, businessName: biz?.businessName, expiresAt: s.currentPeriodEnd, planId: s.planId };
+        })
+    };
+  },
+
+  listMarqueesAdmin() {
+    return store.businesses.map((b) => {
+      const owner = findUserById(b.ownerId);
+      const sub = getSubscriptionStatus(b.id);
+      const bookings = store.bookings.filter((x) => x.businessId === b.id);
+      const revenue = store.payments
+        .filter((p) => p.businessId === b.id && p.paymentStatus === "recorded")
+        .reduce((s, p) => s + p.amount, 0);
+      return {
+        id: b.id,
+        businessName: b.businessName,
+        ownerName: owner?.name,
+        ownerPhone: owner?.phone || b.phone,
+        city: b.address,
+        planName: sub.plan?.name || sub.planId,
+        subscriptionStatus: sub.status,
+        approvalStatus: b.approvalStatus || "approved",
+        teamCount: teamUsage(b.id),
+        totalBookings: bookings.length,
+        totalRevenuePKR: revenue,
+        lastLoginAt: owner?.lastLoginAt || null,
+        status: b.status
+      };
+    });
+  },
+
+  getMarqueeAdminDetail(businessId) {
+    const business = getBusiness(businessId);
+    if (!business) return null;
+    const owner = findUserById(business.ownerId);
+    const sub = getSubscriptionStatus(businessId);
+    const bookings = store.bookings.filter((b) => b.businessId === businessId);
+    const revenue = store.payments
+      .filter((p) => p.businessId === businessId && p.paymentStatus === "recorded")
+      .reduce((s, p) => s + p.amount, 0);
+    const pendingPayments = bookings.filter((b) => b.paymentStatus !== "fully_paid").length;
+    return {
+      business,
+      owner,
+      subscription: sub,
+      teamUsage: { used: teamUsage(businessId), limit: getUserLimit(businessId) },
+      stats: {
+        totalBookings: bookings.length,
+        totalRevenuePKR: revenue,
+        pendingPayments,
+        openIssues: pendingPayments > 0 ? 1 : 0
+      },
+      bookings: bookings.slice(0, 20),
+      customers: store.customers.filter((c) => c.businessId === businessId),
+      teamMembers: store.teamMembers
+        .filter((m) => m.businessId === businessId)
+        .map((m) => {
+          const user = findUserById(m.userId);
+          return { ...m, name: user?.name, phone: user?.phone, permissions: m.permissionsJson };
+        }),
+      packages: store.packages.filter((p) => p.businessId === businessId),
+      payments: store.payments.filter((p) => p.businessId === businessId).slice(0, 20),
+      subscriptionPayments: store.subscriptionPayments.filter((p) => p.businessId === businessId),
+      activityLogs: store.auditLogs
+        .filter((l) => l.targetId === businessId)
+        .slice(0, 30),
+      issues: getMarqueeIssues(businessId)
+    };
+  },
+
+  updateMarqueeApproval(businessId, approvalStatus, admin) {
+    const business = getBusiness(businessId);
+    if (!business) return null;
+    const old = business.approvalStatus;
+    business.approvalStatus = approvalStatus;
+    if (approvalStatus === "suspended") business.status = "suspended";
+    if (approvalStatus === "approved") business.status = "active";
+    persist();
+    if (admin) {
+      db.addAuditLog({
+        adminId: admin.id,
+        adminName: admin.name,
+        action: `business_${approvalStatus}`,
+        module: "approvals",
+        targetId: businessId,
+        oldValue: old,
+        newValue: approvalStatus
+      });
+    }
+    return business;
+  },
+
+  extendSubscription(businessId, days = 30, admin) {
+    const sub = getSubscription(businessId);
+    if (!sub) return null;
+    const end = new Date(sub.currentPeriodEnd || new Date());
+    end.setDate(end.getDate() + days);
+    sub.currentPeriodEnd = end.toISOString();
+    sub.status = "active";
+    persist();
+    if (admin) {
+      db.addAuditLog({
+        adminId: admin.id,
+        adminName: admin.name,
+        action: "subscription_extended",
+        module: "subscriptions",
+        targetId: businessId,
+        newValue: `${days} days`
+      });
+    }
+    return sub;
+  },
+
+  listSubscriptionsAdmin() {
+    return store.businessSubscriptions.map((s) => {
+      const biz = getBusiness(s.businessId);
+      const owner = biz ? findUserById(biz.ownerId) : null;
+      const plan = getPlan(s.planId);
+      return {
+        businessId: s.businessId,
+        businessName: biz?.businessName,
+        ownerPhone: owner?.phone,
+        planId: s.planId,
+        planName: plan?.name,
+        pricePkr: plan?.pricePkr,
+        userLimit: plan?.userLimit,
+        usedMembers: teamUsage(s.businessId),
+        startDate: s.currentPeriodStart,
+        expiryDate: s.currentPeriodEnd,
+        paymentStatus: s.paymentStatus || "pending",
+        subscriptionStatus: s.status
+      };
+    });
+  },
+
+  listSubscriptionPaymentsAdmin(filters = {}) {
+    let list = [...store.subscriptionPayments];
+    if (filters.status) list = list.filter((p) => p.status === filters.status);
+    if (filters.date) list = list.filter((p) => p.paymentDate === filters.date);
+    return list.map((p) => {
+      const biz = getBusiness(p.businessId);
+      return { ...p, businessName: biz?.businessName };
+    });
+  },
+
+  confirmSubscriptionPayment(id, admin, note) {
+    const payment = store.subscriptionPayments.find((p) => p.id === id);
+    if (!payment) return null;
+    payment.status = "confirmed";
+    payment.confirmedBy = admin.name;
+    payment.adminNote = note || "";
+    payment.reviewedAt = new Date().toISOString();
+    activatePlan(payment.businessId, payment.planId);
+    const sub = getSubscription(payment.businessId);
+    if (sub) sub.paymentStatus = "confirmed";
+    persist();
+    db.addAuditLog({
+      adminId: admin.id,
+      adminName: admin.name,
+      action: "payment_confirmed",
+      module: "payments",
+      targetId: id,
+      newValue: note || "confirmed"
+    });
+    return payment;
+  },
+
+  rejectSubscriptionPayment(id, admin, note) {
+    const payment = store.subscriptionPayments.find((p) => p.id === id);
+    if (!payment) return null;
+    payment.status = "rejected";
+    payment.reviewedBy = admin.name;
+    payment.adminNote = note || "";
+    payment.reviewedAt = new Date().toISOString();
+    persist();
+    db.addAuditLog({
+      adminId: admin.id,
+      adminName: admin.name,
+      action: "payment_rejected",
+      module: "payments",
+      targetId: id,
+      newValue: note || "rejected"
+    });
+    return payment;
+  },
+
+  updateAdminUser(id, patch, actor) {
+    const admin = store.adminUsers.find((a) => a.id === id);
+    if (!admin) return null;
+    if (patch.role) admin.role = patch.role;
+    if (patch.status) admin.status = patch.status;
+    if (patch.name) admin.name = patch.name;
+    persist();
+    if (actor) {
+      db.addAuditLog({
+        adminId: actor.id,
+        adminName: actor.name,
+        action: patch.status === "inactive" ? "admin_user_deactivated" : "admin_user_updated",
+        module: "admin_users",
+        targetId: id
+      });
+    }
+    const { passwordHash, ...safe } = admin;
+    return safe;
+  },
+
+  createSubscriptionPayment({ businessId, planId, amount, paymentMethod, proofUrl, note }) {
+    const payment = {
+      id: newId(),
+      businessId,
+      planId,
+      amount: Number(amount),
+      paymentMethod: paymentMethod || "manual",
+      proofUrl: proofUrl || null,
+      note: note || "",
+      paymentDate: new Date().toISOString().slice(0, 10),
+      status: "pending",
+      confirmedBy: null,
+      adminNote: "",
+      createdAt: new Date().toISOString()
+    };
+    store.subscriptionPayments.push(payment);
+    persist();
+    return payment;
+  },
+
+  getSettings() {
+    return store.settings;
+  },
+
+  updateSettings(patch, admin) {
+    Object.assign(store.settings, patch);
+    persist();
+    if (admin) {
+      db.addAuditLog({
+        adminId: admin.id,
+        adminName: admin.name,
+        action: "settings_updated",
+        module: "settings",
+        targetId: "platform"
+      });
+    }
+    return store.settings;
+  },
+
+  createDemoRequest({ name, businessName, phone, city, teamSize, message }) {
+    const request = {
+      id: newId(),
+      name,
+      businessName,
+      phone,
+      city,
+      teamSize: Number.isFinite(teamSize) ? teamSize : null,
+      message: message || "",
+      status: "new",
+      source: "website",
+      createdAt: new Date().toISOString()
+    };
+    store.demoRequests.push(request);
+    persist();
+    return request;
+  },
+
+  listDemoRequests() {
+    return [...store.demoRequests].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 };

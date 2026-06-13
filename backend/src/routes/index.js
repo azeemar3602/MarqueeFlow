@@ -12,11 +12,14 @@ import { packagesRouter } from "./packages.js";
 import { teamRouter } from "./team.js";
 import { notificationsRouter } from "./notifications.js";
 import { adminRouter } from "./admin.js";
+import { adminAuthRouter } from "./adminAuth.js";
 import { healthRouter } from "./health.js";
+import { publicRouter } from "./public.js";
 
 export const apiRouter = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use("/public", publicRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/subscription", subscriptionRouter);
 apiRouter.use("/dashboard", dashboardRouter);
@@ -26,6 +29,7 @@ apiRouter.use("/payments", paymentsRouter);
 apiRouter.use("/packages", packagesRouter);
 apiRouter.use("/team", teamRouter);
 apiRouter.use("/notifications", notificationsRouter);
+apiRouter.use("/admin/auth", adminAuthRouter);
 apiRouter.use("/admin", adminRouter);
 
 /** Legacy + alias routes */

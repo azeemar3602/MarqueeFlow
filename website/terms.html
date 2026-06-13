@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terms &amp; Conditions — MarqueeFlow</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <nav class="nav-bar">
+          <a class="brand" href="/">
+            <span class="logo-mark" aria-hidden="true">MF</span>
+            <h1 class="logo-text">MarqueeFlow</h1>
+          </a>
+          <div class="nav-links" style="display: flex">
+            <a href="/">Home</a>
+            <a href="/#demo">Request Demo</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main class="legal-page">
+      <div class="container" style="max-width: 760px">
+        <h1>Terms &amp; Conditions</h1>
+        <p><em>Last updated: June 2026</em></p>
+        <p>
+          These Terms &amp; Conditions govern your use of the MarqueeFlow website, mobile application, and related
+          services. By using MarqueeFlow, you agree to these terms.
+        </p>
+
+        <h2>Service description</h2>
+        <p>
+          MarqueeFlow provides software for marquee businesses to manage bookings, calendar slots, packages, payments,
+          team members, and subscriptions. The public website is for information and demo requests. The mobile app is
+          for business users. The Super Admin panel is for internal MarqueeFlow administrators only.
+        </p>
+
+        <h2>Account registration</h2>
+        <ul>
+          <li>Marquee owners may register through the mobile app.</li>
+          <li>New businesses may require Super Admin approval before full access is granted.</li>
+          <li>Managers and Waiter Heads may join only through owner invitation.</li>
+          <li>You are responsible for keeping login credentials secure.</li>
+        </ul>
+
+        <h2>Subscriptions &amp; payments</h2>
+        <p>
+          Monthly subscription plans are billed in PKR according to the plan selected. Custom plans may require manual
+          review and approval. Failure to maintain an active subscription may limit access to platform features.
+        </p>
+
+        <h2>Acceptable use</h2>
+        <p>
+          You agree not to misuse the platform, attempt unauthorized access to admin systems, submit false business
+          information, or use MarqueeFlow in violation of applicable laws.
+        </p>
+
+        <h2>Availability</h2>
+        <p>
+          We strive for reliable service but do not guarantee uninterrupted availability. Maintenance, updates, or
+          circumstances beyond our control may affect access temporarily.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          Questions about these terms may be sent to
+          <a data-email href="mailto:support@marqueeflow.com">support@marqueeflow.com</a>.
+        </p>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-bottom" style="border: none; padding-top: 0">
+        <span>© <span id="year"></span> MarqueeFlow</span>
+        <a href="/privacy.html" style="color: rgba(255,255,255,0.85)">Privacy Policy</a>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+    <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+  </body>
+</html>

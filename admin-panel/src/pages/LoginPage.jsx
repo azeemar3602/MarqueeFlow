@@ -22,7 +22,7 @@ export default function LoginPage() {
       await login(phone, password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to sign in. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -30,23 +30,32 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <form className="card login-card" onSubmit={onSubmit}>
-        <p className="eyebrow">MarqueeFlow</p>
-        <h1>Admin Login</h1>
-        <p className="muted">Sign in with phone and password.</p>
-        <label>
-          Phone
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error ? <p className="error">{error}</p> : null}
-        <button className="btn btn-primary" type="submit" disabled={loading}>
-          {loading ? "Signing in..." : "Sign In"}
-        </button>
-      </form>
+      <div className="login-shell">
+        <div className="login-brand">
+          <img src="/marqueeflow-icon.png" alt="MarqueeFlow" />
+          <h1>MarqueeFlow</h1>
+          <p className="muted">Manage. Book. Celebrate.</p>
+        </div>
+        <form className="card login-card" onSubmit={onSubmit}>
+          <p className="eyebrow" style={{ color: "var(--mf-text-muted)" }}>
+            MARQUEEFLOW
+          </p>
+          <h1>Super Admin Login</h1>
+          <p className="muted">Internal platform access only. Business owners use the MarqueeFlow mobile app.</p>
+          <label>
+            Phone
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          </label>
+          <label>
+            Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%" }}>
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

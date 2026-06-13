@@ -1,28 +1,30 @@
 import { Router } from "express";
 import { db } from "../db/store.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireActiveBusiness } from "../middleware/auth.js";
 import { isValidPkPhone, normalizePkPhone } from "../lib/phone.js";
 
 export const bookingsRouter = Router();
 
-bookingsRouter.get("/", requireAuth, (req, res) => {
+bookingsRouter.use(requireAuth, requireActiveBusiness);
+
+bookingsRouter.get("/", (req, res) => {
   const bookings = db.listBookings(req.businessId, req.query);
   res.json({ bookings });
 });
 
-bookingsRouter.get("/event-types", requireAuth, (_req, res) => {
+bookingsRouter.get("/event-types", (_req, res) => {
   res.json({
     eventTypes: ["Mehndi", "Barat", "Walima", "Birthday", "Corporate", "Other"]
   });
 });
 
-bookingsRouter.get("/:id", requireAuth, (req, res) => {
+bookingsRouter.get("/:id", (req, res) => {
   const booking = db.getBooking(req.params.id, req.businessId);
   if (!booking) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Booking not found" } });
   res.json({ booking });
 });
 
-bookingsRouter.post("/", requireAuth, (req, res) => {
+bookingsRouter.post("/", (req, res) => {
   const body = req.body || {};
   if (!body.customerName || !body.customerPhone || !body.eventDate || !body.slotId) {
     return res.status(400).json({ error: { code: "VALIDATION", message: "Missing required fields" } });
@@ -32,6 +34,9 @@ bookingsRouter.post("/", requireAuth, (req, res) => {
   }
   if (!body.guestCount || Number(body.guestCount) < 1) {
     return res.status(400).json({ error: { code: "VALIDATION", message: "Guest count required" } });
+  }
+  if (!body.packageId) {
+    return res.status(400).json({ error: { code: "VALIDATION", message: "Package is required" } });
   }
   try {
     const booking = db.createBooking({
@@ -54,13 +59,13 @@ bookingsRouter.post("/", requireAuth, (req, res) => {
   }
 });
 
-bookingsRouter.patch("/:id", requireAuth, (req, res) => {
+bookingsRouter.patch("/:id", (req, res) => {
   const booking = db.updateBooking(req.params.id, req.businessId, req.body || {});
   if (!booking) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Booking not found" } });
   res.json({ booking });
 });
 
-bookingsRouter.post("/:id/share", requireAuth, (req, res) => {
+bookingsRouter.post("/:id/share", (req, res) => {
   const booking = db.getBooking(req.params.id, req.businessId);
   if (!booking) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Booking not found" } });
   const text = `MarqueeFlow Booking ${booking.bookingCode}\nCustomer: ${booking.customerName}\nDate: ${booking.eventDate}\nGuests: ${booking.guestCount}\nPayment: ${booking.paymentStatus}`;

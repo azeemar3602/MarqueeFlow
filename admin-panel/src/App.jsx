@@ -3,8 +3,11 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import Layout from "./components/Layout.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import BusinessesPage from "./pages/BusinessesPage.jsx";
+import MarqueesPage from "./pages/MarqueesPage.jsx";
+import MarqueeDetailPage from "./pages/MarqueeDetailPage.jsx";
+import ApprovalsPage from "./pages/ApprovalsPage.jsx";
 import PlansPage from "./pages/PlansPage.jsx";
+import SubscriptionsAdminPage from "./pages/SubscriptionsAdminPage.jsx";
 import CustomPlansPage from "./pages/CustomPlansPage.jsx";
 import BookingsPage from "./pages/BookingsPage.jsx";
 import CalendarPage from "./pages/CalendarPage.jsx";
@@ -15,11 +18,13 @@ import TeamPage from "./pages/TeamPage.jsx";
 import NotificationsPage from "./pages/NotificationsPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import AdminUsersPage from "./pages/AdminUsersPage.jsx";
+import AuditLogsPage from "./pages/AuditLogsPage.jsx";
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { admin, loading } = useAuth();
   if (loading) return <div className="login-page"><p>Loading...</p></div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!admin) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -36,18 +41,23 @@ function AppRoutes() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="businesses" element={<BusinessesPage />} />
+        <Route path="marquees" element={<MarqueesPage />} />
+        <Route path="marquees/:id" element={<MarqueeDetailPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="plans" element={<PlansPage />} />
+        <Route path="subscriptions" element={<SubscriptionsAdminPage />} />
         <Route path="custom-plans" element={<CustomPlansPage />} />
+        <Route path="payments" element={<PaymentsPage />} />
         <Route path="bookings" element={<BookingsPage />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="customers" element={<CustomersPage />} />
         <Route path="packages" element={<PackagesPage />} />
-        <Route path="payments" element={<PaymentsPage />} />
         <Route path="team" element={<TeamPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="admin-users" element={<AdminUsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

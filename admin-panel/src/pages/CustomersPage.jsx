@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { EmptyState, PageHeader } from "../components/PageHeader.jsx";
 
 export default function CustomersPage() {
   const [rows, setRows] = useState([]);
@@ -20,16 +21,23 @@ export default function CustomersPage() {
 
   return (
     <section>
-      <header className="page-header"><h1>Customers</h1></header>
-      <article className="card">
-        <table className="table">
-          <thead><tr><th>Name</th><th>Phone</th><th>Bookings</th></tr></thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.phone}><td>{c.name}</td><td>{c.phone}</td><td>{c.bookings}</td></tr>
-            ))}
-          </tbody>
-        </table>
+      <PageHeader
+        title="Customers"
+        subtitle="Customers derived from booking history."
+      />
+      <article className="card panel-card">
+        {rows.length ? (
+          <table className="table">
+            <thead><tr><th>Name</th><th>Phone</th><th>Bookings</th></tr></thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.phone}><td>{c.name}</td><td>{c.phone}</td><td>{c.bookings}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <EmptyState message="No customers yet." />
+        )}
       </article>
     </section>
   );

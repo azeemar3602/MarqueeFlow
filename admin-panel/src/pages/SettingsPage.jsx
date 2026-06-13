@@ -1,22 +1,24 @@
-import { useAuth } from "../context/AuthContext.jsx";
+import { useEffect, useState } from "react";
+import { api } from "../lib/api.js";
+import { PageHeader } from "../components/PageHeader.jsx";
 
 export default function SettingsPage() {
-  const { business, user } = useAuth();
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    api.settings().then((d) => setSettings(d.settings)).catch(() => {});
+  }, []);
 
   return (
     <section>
-      <header className="page-header"><h1>Settings</h1></header>
-      <article className="card">
-        <h2>Business profile</h2>
-        <p><strong>Name:</strong> {business?.businessName}</p>
-        <p><strong>Phone:</strong> {business?.phone}</p>
-        <p><strong>Currency:</strong> {business?.currencyCode || "PKR"}</p>
-        <p><strong>Address:</strong> {business?.address || "—"}</p>
-      </article>
-      <article className="card">
-        <h2>Account</h2>
-        <p><strong>Owner:</strong> {user?.name}</p>
-        <p><strong>Role:</strong> {user?.role}</p>
+      <PageHeader title="Platform Settings" subtitle="Global MarqueeFlow configuration." />
+      <article className="card panel-card">
+        <p><strong>App name:</strong> {settings?.appName}</p>
+        <p><strong>Currency:</strong> {settings?.currencyCode || "PKR"}</p>
+        <p><strong>Trial days:</strong> {settings?.trialDays}</p>
+        <p><strong>Manual approval:</strong> {settings?.manualApprovalEnabled ? "Enabled" : "Disabled"}</p>
+        <p><strong>Support phone:</strong> {settings?.supportPhone || "—"}</p>
+        <p><strong>Support email:</strong> {settings?.supportEmail || "—"}</p>
       </article>
     </section>
   );

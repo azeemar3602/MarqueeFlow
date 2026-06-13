@@ -5,8 +5,9 @@ Booking and restaurant/service flow platform with admin panel, backend API, and 
 ## Structure
 
 - `backend/` — Node.js API (Express)
-- `admin-panel/` — React admin SPA (Vite)
-- `mobile-app/` — Flutter customer booking app
+- `admin-panel/` — React Super Admin SPA (Vite) → admin.marqueeflow.com
+- `website/` — Public marketing site (Vite) → marqueeflow.com
+- `mobile-app/` — Flutter app for owners, managers, waiter heads
 - `.github/workflows/` — CI/CD
 
 ## Branches
@@ -27,14 +28,15 @@ Three GitHub Actions workflows (see `docs/CICD.md`):
 ```bash
 cd backend && npm install && npm run dev
 cd admin-panel && npm install && npm run dev
+cd website && npm install && npm run dev
 cd mobile-app && flutter pub get && flutter run
 ```
 
 ## Production URLs
 
+- Site: https://marqueeflow.com
 - API: https://api.marqueeflow.com
 - Admin: https://admin.marqueeflow.com
-- Site: https://marqueeflow.com
 
 ## VPS paths
 

@@ -1,25 +1,25 @@
 import { Router } from "express";
 import { db } from "../db/store.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requireActiveBusiness, requireRole } from "../middleware/auth.js";
 import { hashPassword } from "../lib/password.js";
 import { isValidPkPhone, normalizePkPhone } from "../lib/phone.js";
 import { DEFAULT_PERMISSIONS, INVITE_ROLES } from "../data/roles.js";
 
 export const teamRouter = Router();
 
-teamRouter.get("/members", requireAuth, (req, res) => {
+teamRouter.get("/members", requireAuth, requireActiveBusiness, (req, res) => {
   res.json({ members: db.getTeamMembers(req.businessId) });
 });
 
-teamRouter.get("/usage", requireAuth, (req, res) => {
+teamRouter.get("/usage", requireAuth, requireActiveBusiness, (req, res) => {
   res.json(db.getTeamUsage(req.businessId));
 });
 
-teamRouter.get("/invites", requireAuth, requireRole("owner"), (req, res) => {
+teamRouter.get("/invites", requireAuth, requireActiveBusiness, requireRole("owner"), (req, res) => {
   res.json({ invites: db.listTeamInvites(req.businessId) });
 });
 
-teamRouter.post("/invite", requireAuth, requireRole("owner"), (req, res) => {
+teamRouter.post("/invite", requireAuth, requireActiveBusiness, requireRole("owner"), (req, res) => {
   const { name, phone, role, permissions } = req.body || {};
   if (!name || !phone || !role) {
     return res.status(400).json({ error: { code: "VALIDATION", message: "name, role, phone required" } });
@@ -61,6 +61,8 @@ teamRouter.post("/invites/:token/accept", async (req, res) => {
   res.json({ user: { id: user.id, name: user.name, role: user.role } });
 });
 
-teamRouter.patch("/members/:id", requireAuth, requireRole("owner"), (req, res) => {
-  res.json({ ok: true, message: "Member updated" });
+teamRouter.patch("/members/:id", requireAuth, requireActiveBusiness, requireRole("owner"), (req, res) => {
+  const member = db.updateTeamMember(req.params.id, req.businessId, req.body || {});
+  if (!member) return res.status(404).json({ error: { code: "NOT_FOUND", message: "Member not found" } });
+  res.json({ member });
 });

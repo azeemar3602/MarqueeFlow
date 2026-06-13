@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/mf_components.dart';
+import '../utils/api_errors.dart';
+import '../widgets/mf_navigation.dart';
 import '../widgets/status_badge.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,7 +20,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _summary;
+  String? _userName;
+  int _notificationCount = 0;
   bool _loading = true;
+
+  String? _error;
 
   @override
   void initState() {
@@ -23,30 +33,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final summary = await widget.api.fetchDashboard();
-      setState(() => _summary = summary);
-    } catch (_) {}
+      final me = await widget.api.fetchMe();
+      final notifications = await widget.api.fetchNotifications();
+      setState(() {
+        _summary = summary;
+        _userName = me['user']?['name'] as String? ?? summary['greetingName'] as String?;
+        _notificationCount = notifications.length;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = mapRequestError(e).message);
+    }
     if (mounted) setState(() => _loading = false);
   }
 
-  Widget _statCard(String title, String value, IconData icon) {
+  Widget _statCard(String title, String value) {
     return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: const Color(0xFF317EE5)),
-              const SizedBox(height: 8),
-              Text(title, style: const TextStyle(color: Color(0xFF434753), fontSize: 12)),
-              const SizedBox(height: 4),
-              Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            ],
-          ),
+      child: MfCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: AppText.body().copyWith(fontSize: 12)),
+            const SizedBox(height: 8),
+            Text(value, style: AppText.display(value, size: 24)),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _statRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: AppText.label())),
+          Text(value, style: AppText.body().copyWith(color: AppColors.maroon, fontWeight: FontWeight.w700)),
+        ],
       ),
     );
   }
@@ -54,101 +82,111 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final upcoming = (_summary?['upcoming'] as List<dynamic>?) ?? [];
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await widget.api.logout();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/calendar'),
-        icon: const Icon(Icons.add),
-        label: const Text('New Booking'),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Row(
+    final today = _summary?['date'] as String? ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final formattedDate = DateFormat('EEE, d MMM yyyy').format(DateTime.parse(today));
+
+    if (_loading) return mfLoadingScreen();
+
+    return MfScreenShell(
+      title: 'Home Dashboard',
+      subtitle: 'Today, upcoming events, and quick actions.',
+      notificationCount: _notificationCount,
+      endDrawer: buildMfDrawer(widget.api, '/home'),
+      child: RefreshIndicator(
+        color: AppColors.maroon,
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            if (_error != null) ...[
+              MfErrorBanner(_error!),
+              const SizedBox(height: 12),
+            ],
+          MfCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _statCard('Today', '${_summary?['todayCount'] ?? 0}', Icons.today),
-                      const SizedBox(width: 12),
-                      _statCard('Pending', '${_summary?['pendingPayments'] ?? 0}', Icons.payments),
+                      Text('Hello, ${_userName ?? 'there'}', style: AppText.display('Hello', size: 24)),
+                      const SizedBox(height: 4),
+                      Text(formattedDate, style: AppText.body()),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _statCard('Upcoming', '${_summary?['upcomingCount'] ?? upcoming.length}', Icons.event),
-                      const SizedBox(width: 12),
-                      _statCard('Available slots', '${_summary?['availableSlotsToday'] ?? 0}', Icons.schedule),
-                    ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldLight,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.gold),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Quick links', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ActionChip(label: const Text('Bookings'), onPressed: () => context.push('/bookings')),
-                      ActionChip(label: const Text('Calendar'), onPressed: () => context.push('/calendar')),
-                      ActionChip(label: const Text('Payments'), onPressed: () => context.push('/payments')),
-                      ActionChip(label: const Text('Team'), onPressed: () => context.push('/team')),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Upcoming events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  if (upcoming.isEmpty)
-                    const Card(child: ListTile(title: Text('No upcoming events')))
-                  else
-                    ...upcoming.take(5).map((b) {
-                      final booking = b as Map<String, dynamic>;
-                      return Card(
-                        child: ListTile(
-                          title: Text(booking['customerName'] as String? ?? 'Booking'),
-                          subtitle: Text('${booking['eventDate']} · ${booking['eventType'] ?? ''}'),
-                          trailing: StatusBadge(label: booking['status'] as String? ?? 'pending'),
-                          onTap: () => context.push('/bookings/${booking['id']}'),
-                        ),
-                      );
-                    }),
-                ],
-              ),
+                  child: Text('Today', style: AppText.label().copyWith(color: AppColors.maroon)),
+                ),
+              ],
             ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (i) {
-          switch (i) {
-            case 1:
-              context.push('/bookings');
-            case 2:
-              context.push('/calendar');
-            case 3:
-              context.push('/payments');
-            case 4:
-              context.push('/team');
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.list_alt), label: 'Bookings'),
-          NavigationDestination(icon: Icon(Icons.calendar_month), label: 'Calendar'),
-          NavigationDestination(icon: Icon(Icons.payments), label: 'Payments'),
-          NavigationDestination(icon: Icon(Icons.group), label: 'Team'),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _statCard('Today', '${_summary?['todayCount'] ?? _summary?['todayBookings'] ?? 0}'),
+              const SizedBox(width: 12),
+              _statCard('Upcoming', '${_summary?['upcomingCount'] ?? _summary?['upcomingEvents'] ?? 0}'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _statCard('Slots today', '${_summary?['availableSlotsToday'] ?? _summary?['availableSlots'] ?? 0}'),
+              const SizedBox(width: 12),
+              _statCard('Payment pending', '${_summary?['pendingPayments'] ?? _summary?['paymentPending'] ?? 0}'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          MfCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Booking overview', style: AppText.display('Booking overview', size: 20)),
+                _statRow('Total bookings', '${_summary?['totalBookings'] ?? 0}'),
+                _statRow('Pending bookings', '${_summary?['pendingBookings'] ?? 0}'),
+                _statRow('Confirmed bookings', '${_summary?['confirmedBookings'] ?? 0}'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          MfCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Upcoming events', style: AppText.display('Upcoming events', size: 22)),
+                const SizedBox(height: 12),
+                if (upcoming.isEmpty)
+                  Text('No upcoming events', style: AppText.body())
+                else
+                  ...upcoming.map((raw) {
+                    final b = raw as Map<String, dynamic>;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('${b['customerName']} · ${b['eventDate']}', style: AppText.label()),
+                          ),
+                          StatusBadge(label: b['status'] as String? ?? 'pending'),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          MfPrimaryButton(label: 'Add New Booking', icon: Icons.add, onPressed: () => context.push('/calendar')),
+          const SizedBox(height: 24),
         ],
+        ),
       ),
     );
   }

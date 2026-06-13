@@ -14,6 +14,7 @@ export const DEFAULT_PERMISSIONS = {
     managePayments: true,
     manageCustomers: true,
     manageReports: true,
+    managePackages: false,
     manageTeam: false
   },
   head_waiter: {

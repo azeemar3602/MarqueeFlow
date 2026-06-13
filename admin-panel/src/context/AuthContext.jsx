@@ -4,8 +4,7 @@ import { api, getToken, setToken } from "../lib/api.js";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [business, setBusiness] = useState(null);
+  const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,8 +15,7 @@ export function AuthProvider({ children }) {
       }
       try {
         const data = await api.me();
-        setUser(data.user);
-        setBusiness(data.business);
+        setAdmin(data.admin);
       } catch {
         setToken(null);
       } finally {
@@ -29,15 +27,13 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      user,
-      business,
+      admin,
+      user: admin,
       loading,
       async login(phone, password) {
         const data = await api.login(phone, password);
         setToken(data.token);
-        setUser(data.user);
-        const me = await api.me();
-        setBusiness(me.business);
+        setAdmin(data.admin);
         return data;
       },
       async logout() {
@@ -47,11 +43,10 @@ export function AuthProvider({ children }) {
           /* ignore */
         }
         setToken(null);
-        setUser(null);
-        setBusiness(null);
+        setAdmin(null);
       }
     }),
-    [user, business, loading]
+    [admin, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

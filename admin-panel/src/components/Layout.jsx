@@ -3,29 +3,36 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 const nav = [
   { to: "/", label: "Dashboard", end: true },
-  { to: "/businesses", label: "Businesses" },
+  { to: "/marquees", label: "Marquees" },
+  { to: "/approvals", label: "Approvals" },
   { to: "/plans", label: "Subscription Plans" },
+  { to: "/subscriptions", label: "Subscriptions" },
   { to: "/custom-plans", label: "Custom Plan Requests" },
-  { to: "/bookings", label: "Bookings" },
-  { to: "/calendar", label: "Calendar & Slots" },
-  { to: "/customers", label: "Customers" },
-  { to: "/packages", label: "Packages" },
-  { to: "/payments", label: "Payments" },
-  { to: "/team", label: "Team Members" },
+  { to: "/payments", label: "Payments / Revenue" },
+  { to: "/bookings", label: "Bookings Data" },
+  { to: "/customers", label: "Customers Data" },
+  { to: "/team", label: "Team Members Data" },
+  { to: "/packages", label: "Packages Data" },
+  { to: "/calendar", label: "Calendar & Slots Data" },
   { to: "/notifications", label: "Notifications" },
   { to: "/reports", label: "Reports" },
-  { to: "/settings", label: "Settings" }
+  { to: "/admin-users", label: "Admin Users" },
+  { to: "/settings", label: "Settings" },
+  { to: "/audit-logs", label: "Audit Logs" }
 ];
 
 export default function Layout() {
-  const { user, business, logout } = useAuth();
+  const { admin, logout } = useAuth();
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <p className="eyebrow">MarqueeFlow</p>
-          <h2>Control Panel</h2>
+          <img src="/marqueeflow-icon.png" alt="MarqueeFlow" className="brand-logo" />
+          <div>
+            <p className="eyebrow">MarqueeFlow</p>
+            <h2 className="brand-title">Super Admin</h2>
+          </div>
         </div>
         <nav className="nav">
           {nav.map((item) => (
@@ -35,8 +42,8 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <p className="muted">{user?.name}</p>
-          <p className="muted small">{business?.businessName}</p>
+          <p className="muted">{admin?.name}</p>
+          <p className="muted small">{admin?.role?.replace("_", " ")}</p>
           <button type="button" className="btn btn-ghost" onClick={logout}>
             Logout
           </button>

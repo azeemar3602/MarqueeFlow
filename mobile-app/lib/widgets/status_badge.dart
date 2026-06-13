@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.label, this.color});
 
@@ -18,7 +20,7 @@ class StatusBadge extends StatelessWidget {
     if (lower.contains('cancel') || lower.contains('expired')) {
       return const Color(0xFFDC2626);
     }
-    return const Color(0xFF317EE5);
+    return AppColors.maroon;
   }
 
   @override

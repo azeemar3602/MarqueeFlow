@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../utils/api_errors.dart';
+import '../widgets/mf_components.dart';
+import '../widgets/mf_navigation.dart';
 
 class InviteTeamScreen extends StatefulWidget {
   const InviteTeamScreen({super.key, required this.api});
@@ -15,8 +20,13 @@ class _InviteTeamScreenState extends State<InviteTeamScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   String _role = 'manager';
-  bool _manageBookings = true;
-  bool _managePayments = true;
+  final Map<String, bool> _permissions = {
+    'Manage bookings': true,
+    'Record payments': false,
+    'Package management': false,
+    'View reports': false,
+    'Assign waiter heads': false,
+  };
   bool _loading = false;
   String? _error;
 
@@ -33,19 +43,13 @@ class _InviteTeamScreenState extends State<InviteTeamScreen> {
       _error = null;
     });
     try {
-      final permissions = _role == 'manager'
-          ? {
-              'manageBookings': _manageBookings,
-              'managePayments': _managePayments,
-              'manageCustomers': true,
-              'manageReports': true,
-              'manageTeam': false,
-            }
-          : {
-              'viewAssignedEvents': true,
-              'updateOperationalStatus': true,
-              'managePayments': false,
-            };
+      final permissions = {
+        'manageBookings': _permissions['Manage bookings'] ?? false,
+        'managePayments': _permissions['Record payments'] ?? false,
+        'managePackages': _permissions['Package management'] ?? false,
+        'manageReports': _permissions['View reports'] ?? false,
+        'assignWaiterHeads': _permissions['Assign waiter heads'] ?? false,
+      };
       await widget.api.inviteTeamMember(
         name: _nameCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
@@ -55,10 +59,8 @@ class _InviteTeamScreenState extends State<InviteTeamScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invite sent')));
       context.pop();
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = mapRequestError(e).message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -66,53 +68,47 @@ class _InviteTeamScreenState extends State<InviteTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Invite Team Member')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+    return MfScreenShell(
+      title: 'Invite Team Member',
+      endDrawer: buildMfDrawer(widget.api, '/team'),
+      onBack: () => mfGoBack(context, fallback: '/team'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Invite Manager or Waiter Head using phone number only.'),
+          MfTextField(label: 'Full Name', iconLetter: 'N', controller: _nameCtrl, hint: 'Enter manager / waiter head name', enabled: !_loading),
           const SizedBox(height: 16),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Full name')),
-          const SizedBox(height: 12),
+          MfTextField(label: 'Phone Number', iconLetter: 'P', controller: _phoneCtrl, hint: 'Enter Pakistani mobile number', keyboardType: TextInputType.phone, enabled: !_loading),
+          const SizedBox(height: 16),
+          Text('Role', style: AppText.label()),
+          const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _role,
-            decoration: const InputDecoration(labelText: 'Role'),
+            initialValue: _role,
+            decoration: const InputDecoration(
+              prefixIcon: MfFieldIcon('R'),
+              prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+            ),
             items: const [
               DropdownMenuItem(value: 'manager', child: Text('Manager')),
               DropdownMenuItem(value: 'head_waiter', child: Text('Waiter Head')),
             ],
-            onChanged: (v) => setState(() => _role = v ?? 'manager'),
+            onChanged: _loading ? null : (v) => setState(() => _role = v ?? 'manager'),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _phoneCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Pakistani mobile number'),
-          ),
-          if (_role == 'manager') ...[
-            const SizedBox(height: 16),
-            const Text('Permissions', style: TextStyle(fontWeight: FontWeight.bold)),
-            CheckboxListTile(
-              value: _manageBookings,
-              onChanged: (v) => setState(() => _manageBookings = v ?? true),
-              title: const Text('Manage bookings'),
-            ),
-            CheckboxListTile(
-              value: _managePayments,
-              onChanged: (v) => setState(() => _managePayments = v ?? true),
-              title: const Text('Manage payments'),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          ],
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _loading ? null : _submit,
-            child: Text(_loading ? 'Sending...' : 'Send Invite'),
+          Text('Permissions', style: AppText.display('Permissions', size: 20)),
+          const SizedBox(height: 8),
+          ..._permissions.keys.map(
+            (label) => CheckboxListTile(
+              value: _permissions[label],
+              onChanged: _loading ? null : (v) => setState(() => _permissions[label] = v ?? false),
+              title: Text(label, style: AppText.body()),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
           ),
+          if (_error != null) ...[const SizedBox(height: 12), MfErrorBanner(_error!)],
+          const SizedBox(height: 16),
+          MfPrimaryButton(label: 'Send Invite', loading: _loading, onPressed: _submit),
+          const MfCaption('Invite is blocked if plan member limit is reached'),
         ],
       ),
     );

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/api_errors.dart';
+import '../widgets/mf_components.dart';
+import '../widgets/mf_navigation.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key, required this.api});
@@ -17,24 +21,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Map<String, dynamic>? _status;
   bool _loading = true;
   String? _error;
-  final _customSizeCtrl = TextEditingController(text: '7');
-  final _customNameCtrl = TextEditingController();
-  final _customPhoneCtrl = TextEditingController();
-  final _customNoteCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _customSizeCtrl.dispose();
-    _customNameCtrl.dispose();
-    _customPhoneCtrl.dispose();
-    _customNoteCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -50,53 +41,51 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _status = status;
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = mapRequestError(e).message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _selectPlan(Map<String, dynamic> plan) async {
-    if (plan['requestCustom'] == true) {
-      _showCustomDialog();
-      return;
-    }
-    try {
-      await widget.api.startTrial(plan['id'] as String);
-      await widget.api.checkoutPlan(plan['id'] as String);
-      if (!mounted) return;
-      context.go('/home');
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
+  Future<void> _startTrial() async {
+    final standard = _plans.cast<Map<String, dynamic>?>().firstWhere(
+          (p) => p?['isRecommended'] == true || p?['id'] == 'standard',
+          orElse: () => _plans.isNotEmpty ? _plans.first as Map<String, dynamic> : null,
+        );
+    if (standard == null) return;
+    await _selectPlan(standard);
   }
 
-  Future<void> _showCustomDialog() async {
+  Future<void> _showCustomPlanForm() async {
+    final sizeCtrl = TextEditingController(text: '10');
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    try {
+      final me = await widget.api.fetchMe();
+      nameCtrl.text = me['user']?['name'] as String? ?? '';
+      phoneCtrl.text = me['user']?['phone'] as String? ?? '';
+    } catch (_) {}
+
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Request Custom Plan'),
+        backgroundColor: AppColors.cream,
+        title: Text('Request Custom Plan', style: AppText.display('Request Custom Plan', size: 22)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('For teams above 6 persons, submit a custom plan request.'),
+              Text('For teams above 6 persons. Our team will contact you with custom pricing.', style: AppText.body()),
               const SizedBox(height: 12),
-              TextField(
-                controller: _customSizeCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Requested team size'),
-              ),
-              TextField(controller: _customNameCtrl, decoration: const InputDecoration(labelText: 'Contact name')),
-              TextField(
-                controller: _customPhoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone'),
-              ),
-              TextField(
-                controller: _customNoteCtrl,
-                decoration: const InputDecoration(labelText: 'Note'),
-              ),
+              MfTextField(label: 'Requested team size', iconLetter: 'T', controller: sizeCtrl, keyboardType: TextInputType.number),
+              const SizedBox(height: 12),
+              MfTextField(label: 'Contact name', iconLetter: 'N', controller: nameCtrl),
+              const SizedBox(height: 12),
+              MfTextField(label: 'Phone number', iconLetter: 'P', controller: phoneCtrl, keyboardType: TextInputType.phone),
+              const SizedBox(height: 12),
+              MfTextField(label: 'Note (optional)', iconLetter: 'T', controller: noteCtrl),
             ],
           ),
         ),
@@ -106,84 +95,135 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             onPressed: () async {
               try {
                 await widget.api.requestCustomPlan(
-                  requestedTeamSize: int.parse(_customSizeCtrl.text),
-                  contactName: _customNameCtrl.text.trim(),
-                  phone: _customPhoneCtrl.text.trim(),
-                  note: _customNoteCtrl.text.trim(),
+                  requestedTeamSize: int.parse(sizeCtrl.text),
+                  contactName: nameCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
                 );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Custom plan request submitted')),
-                  );
-                }
-              } on ApiException catch (e) {
                 if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.message)));
+                  Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Custom plan request submitted. We will contact you soon.')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(mapRequestError(e).message)));
                 }
               }
             },
-            child: const Text('Submit'),
+            child: const Text('Submit Request'),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _selectPlan(Map<String, dynamic> plan) async {
+    if (plan['requestCustom'] == true) {
+      await _showCustomPlanForm();
+      return;
+    }
+    try {
+      await widget.api.startTrial(plan['id'] as String);
+      await widget.api.checkoutPlan(plan['id'] as String);
+      if (!mounted) return;
+      context.go('/home');
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mapRequestError(e).message)));
+    }
+  }
+
+  Color _planAccent(Map<String, dynamic> plan) {
+    final limit = plan['userLimit'] as int? ?? 1;
+    if (limit <= 1) return AppColors.soloAccent;
+    return AppColors.teamAccent;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Subscription Plans')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                if (_status != null)
-                  Card(
-                    child: ListTile(
-                      title: Text('Current: ${_status!['plan']?['name'] ?? _status!['planId'] ?? 'None'}'),
-                      subtitle: Text('Status: ${_status!['status'] ?? 'unknown'}'),
-                    ),
-                  ),
-                if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 12),
-                const Text('Choose a PKR plan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                ..._plans.map((plan) {
-                  final custom = plan['requestCustom'] == true;
-                  final recommended = plan['recommended'] == true;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      title: Row(
-                        children: [
-                          Text(plan['name'] as String? ?? 'Plan'),
-                          if (recommended) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text('Recommended', style: TextStyle(fontSize: 11)),
-                            ),
-                          ],
-                        ],
-                      ),
-                      subtitle: Text(
-                        custom
-                            ? 'Request custom plan for 6+ team members'
-                            : 'PKR ${plan['pricePkr'] ?? plan['priceMonthly']} / month · ${plan['userLimit']} person(s)',
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () => _selectPlan(plan as Map<String, dynamic>),
-                    ),
-                  );
-                }),
-              ],
+    if (_loading) return mfLoadingScreen();
+
+    return MfScreenShell(
+      title: 'Subscription Plans',
+      subtitle: 'Pakistan pricing in PKR',
+      endDrawer: buildMfDrawer(widget.api, '/subscription'),
+      onBack: () => mfGoBack(context, fallback: '/home'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_status != null)
+            MfCard(
+              child: Text('Current status: ${_status!['status'] ?? 'none'}', style: AppText.body()),
             ),
+          if (_error != null) ...[MfErrorBanner(_error!), const SizedBox(height: 16)],
+          ..._plans.map((raw) {
+            final plan = raw as Map<String, dynamic>;
+            final custom = plan['requestCustom'] == true;
+            final recommended = plan['isRecommended'] == true;
+            final features = (plan['features'] as List<dynamic>?) ?? [];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: MfCard(
+                highlighted: recommended,
+                badge: recommended ? 'RECOMMENDED' : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: _planAccent(plan),
+                          child: Text('${plan['userLimit'] ?? '∞'}', style: AppText.label()),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(plan['name'] as String? ?? 'Plan', style: AppText.display(plan['name'] as String? ?? 'Plan', size: 22)),
+                              Text(
+                                custom ? 'Request custom pricing' : 'PKR ${plan['pricePkr'] ?? plan['priceMonthly']} / month',
+                                style: AppText.body(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (features.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ...features.map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, size: 16, color: AppColors.maroon),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text('$f', style: AppText.body())),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    MfPrimaryButton(
+                      label: custom ? 'Request Custom Plan' : 'Choose Plan',
+                      onPressed: () => _selectPlan(plan),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          MfPrimaryButton(label: 'Start Free Trial', onPressed: _startTrial),
+          const MfCaption('No credit card required • Upgrade anytime'),
+        ],
+      ),
     );
   }
 }

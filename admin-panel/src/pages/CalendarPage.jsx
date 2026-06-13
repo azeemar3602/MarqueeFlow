@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { EmptyState, PageHeader } from "../components/PageHeader.jsx";
 
 export default function CalendarPage() {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -18,12 +19,14 @@ export default function CalendarPage() {
 
   return (
     <section>
-      <header className="page-header">
-        <h1>Calendar & Slots</h1>
+      <PageHeader
+        title="Calendar & Slots"
+        subtitle="Month overview and daily slot capacity."
+      >
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-      </header>
+      </PageHeader>
       <div className="grid">
-        <article className="card">
+        <article className="card panel-card">
           <h2>Month days</h2>
           <div className="chip-row">
             {days.map((d) => (
@@ -33,14 +36,17 @@ export default function CalendarPage() {
             ))}
           </div>
         </article>
-        <article className="card">
+        <article className="card panel-card">
           <h2>Slots {selected ? `for ${selected}` : ""}</h2>
-          <ul className="list">
-            {slots.map((s) => (
-              <li key={s.id}>{s.slotName} · {s.startTime}-{s.endTime} · {s.bookedCount}/{s.capacity}</li>
-            ))}
-            {!slots.length ? <li>Select a date to view slots</li> : null}
-          </ul>
+          {slots.length ? (
+            <ul className="list">
+              {slots.map((s) => (
+                <li key={s.id}>{s.slotName} · {s.startTime}-{s.endTime} · {s.bookedCount}/{s.capacity}</li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState message={selected ? "No slots for this date." : "Select a date to view slots."} />
+          )}
         </article>
       </div>
     </section>

@@ -38,6 +38,10 @@ cd ../admin-panel
 npm ci
 VITE_API_BASE_URL="${VITE_API_BASE_URL}" npm run build
 
+cd ../website
+npm ci
+npm run build
+
 cd ..
 
 if pm2 describe "${PM2_APP_NAME}" >/dev/null 2>&1; then
@@ -49,5 +53,6 @@ pm2 save
 
 curl -fsS "http://127.0.0.1:${HEALTH_PORT}/health"
 test -f admin-panel/dist/index.html
+test -f website/dist/index.html
 
 echo "Deploy OK: ${PM2_APP_NAME} @ ${DEPLOY_PATH} (port ${HEALTH_PORT})"

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../utils/api_errors.dart';
+import '../utils/auth_routing.dart';
+import '../widgets/mf_components.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.api});
@@ -35,25 +40,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final phone = _phoneCtrl.text.trim();
+    final password = _passCtrl.text;
+    if (phone.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Phone number and password are required.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await widget.api.login(
-        phone: _phoneCtrl.text.trim(),
-        password: _passCtrl.text,
-        role: _role,
-        remember: _remember,
-      );
-      final sub = await widget.api.fetchSubscriptionStatus();
-      final status = sub['status'] as String? ?? 'none';
-      final active = status == 'trial' || status == 'active';
-      context.go(active ? '/home' : '/subscription');
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      await widget.api.login(phone: phone, password: password, role: _role, remember: _remember);
+      if (!mounted) return;
+      context.go(await resolveAuthenticatedRoute(widget.api));
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (!mounted) return;
+      setState(() => _error = mapRequestError(e).message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -61,66 +64,79 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign In')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+    return MfAuthShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Welcome back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('Sign In', style: AppText.display('Sign In', size: 30)),
           const SizedBox(height: 8),
-          const Text('Sign in to manage bookings and events.'),
+          Text('Sign in to manage bookings and events.', style: AppText.body()),
           const SizedBox(height: 24),
+          Text('Role', style: AppText.label()),
+          const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _role,
-            decoration: const InputDecoration(labelText: 'Role'),
+            initialValue: _role,
+            decoration: InputDecoration(
+              prefixIcon: const MfFieldIcon('R'),
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+            ),
             items: [
               const DropdownMenuItem(value: null, child: Text('Any role')),
-              ..._roles.map((r) => DropdownMenuItem(
-                    value: r['id'] as String,
-                    child: Text(r['label'] as String? ?? r['id'] as String),
-                  )),
-            ],
-            onChanged: (v) => setState(() => _role = v),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _phoneCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Phone number'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passCtrl,
-            obscureText: _obscure,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                onPressed: () => setState(() => _obscure = !_obscure),
+              ..._roles.map(
+                (r) => DropdownMenuItem(
+                  value: r['id'] as String,
+                  child: Text(r['label'] as String? ?? r['id'] as String),
+                ),
               ),
+            ],
+            onChanged: _loading ? null : (v) => setState(() => _role = v),
+          ),
+          const SizedBox(height: 16),
+          MfTextField(
+            label: 'Phone number',
+            iconLetter: 'P',
+            controller: _phoneCtrl,
+            hint: 'Enter Pakistani mobile number',
+            keyboardType: TextInputType.phone,
+            enabled: !_loading,
+          ),
+          const SizedBox(height: 16),
+          MfTextField(
+            label: 'Password',
+            iconLetter: 'S',
+            controller: _passCtrl,
+            hint: 'Enter your password',
+            obscureText: _obscure,
+            enabled: !_loading,
+            onSubmitted: (_) => _submit(),
+            suffix: IconButton(
+              icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              onPressed: () => setState(() => _obscure = !_obscure),
             ),
           ),
-          CheckboxListTile(
-            value: _remember,
-            onChanged: (v) => setState(() => _remember = v ?? true),
-            title: const Text('Remember me'),
-            contentPadding: EdgeInsets.zero,
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  value: _remember,
+                  onChanged: _loading ? null : (v) => setState(() => _remember = v ?? true),
+                  title: Text('Remember me', style: AppText.body()),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                ),
+              ),
+              TextButton(
+                onPressed: _loading ? null : () => context.push('/forgot-password'),
+                child: Text('Forgot password?', style: AppText.label().copyWith(color: AppColors.maroon)),
+              ),
+            ],
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(onPressed: () {}, child: const Text('Forgot password?')),
-          ),
-          if (_error != null) ...[
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 8),
-          ],
-          ElevatedButton(
-            onPressed: _loading ? null : _submit,
-            child: Text(_loading ? 'Signing in...' : 'Sign In'),
-          ),
+          if (_error != null) ...[MfErrorBanner(_error!), const SizedBox(height: 16)],
+          MfPrimaryButton(label: 'Sign In', loading: _loading, onPressed: _submit),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () => context.push('/register'),
+            onPressed: _loading ? null : () => context.push('/register'),
             child: const Text('Create New Account'),
           ),
         ],

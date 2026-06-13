@@ -1,7 +1,9 @@
 import dotenv from "dotenv";
 import { createApp } from "./app.js";
+import { validateJwtConfig } from "./lib/jwt.js";
 
 dotenv.config();
+validateJwtConfig();
 
 const port = Number(process.env.PORT || 4010);
 const host = process.env.HOST || "127.0.0.1";

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { Badge, EmptyState, PageHeader } from "../components/PageHeader.jsx";
 
 export default function BookingsPage() {
   const [rows, setRows] = useState([]);
@@ -17,31 +18,37 @@ export default function BookingsPage() {
 
   return (
     <section>
-      <header className="page-header">
-        <h1>Bookings</h1>
+      <PageHeader
+        title="Bookings"
+        subtitle="Search and review all venue bookings."
+      >
         <div className="toolbar">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bookings" />
           <button type="button" className="btn btn-primary" onClick={load}>Search</button>
         </div>
-      </header>
-      <article className="card">
-        <table className="table">
-          <thead>
-            <tr><th>Code</th><th>Customer</th><th>Date</th><th>Event</th><th>Status</th><th>Payment</th></tr>
-          </thead>
-          <tbody>
-            {rows.map((b) => (
-              <tr key={b.id}>
-                <td>{b.bookingCode}</td>
-                <td>{b.customerName}</td>
-                <td>{b.eventDate}</td>
-                <td>{b.eventType}</td>
-                <td>{b.status}</td>
-                <td>{b.paymentStatus}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      </PageHeader>
+      <article className="card panel-card">
+        {rows.length ? (
+          <table className="table">
+            <thead>
+              <tr><th>Code</th><th>Customer</th><th>Date</th><th>Event</th><th>Status</th><th>Payment</th></tr>
+            </thead>
+            <tbody>
+              {rows.map((b) => (
+                <tr key={b.id}>
+                  <td>{b.bookingCode}</td>
+                  <td>{b.customerName}</td>
+                  <td>{b.eventDate}</td>
+                  <td>{b.eventType}</td>
+                  <td><Badge>{b.status}</Badge></td>
+                  <td><Badge>{b.paymentStatus}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <EmptyState message="No bookings found." />
+        )}
       </article>
     </section>
   );

@@ -57,6 +57,14 @@ async function capturePhase3(browser) {
 
   await page.goto(`${ADMIN_BASE}/payments`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1000);
+  const reviewBtn = page.getByRole("button", { name: "Review" }).first();
+  if (await reviewBtn.count()) {
+    await reviewBtn.click();
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: path.join(PHASE3_DIR, "07-payments-review-modal.png"), fullPage: false });
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+  }
   await page.screenshot({ path: path.join(PHASE3_DIR, "07-payments-review.png"), fullPage: true });
 
   await page.goto(`${ADMIN_BASE}/admin-users`, { waitUntil: "networkidle" });
