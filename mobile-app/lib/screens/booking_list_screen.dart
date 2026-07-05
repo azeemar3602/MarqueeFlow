@@ -4,10 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/phone_launcher.dart';
-import '../widgets/mf_components.dart';
 import '../utils/api_errors.dart';
+import '../widgets/mf_components.dart';
 import '../widgets/mf_navigation.dart';
-import '../widgets/status_badge.dart';
 
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key, required this.api});
@@ -139,7 +138,7 @@ class _BookingListScreenState extends State<BookingListScreen> {
       title: 'Booking List',
       subtitle: 'Search and manage all bookings.',
       endDrawer: buildMfDrawer(widget.api, '/bookings'),
-      onBack: () => mfGoBack(context, fallback: '/bookings'),
+      onBack: () => mfGoBack(context, fallback: '/home'),
       child: RefreshIndicator(
         color: AppColors.maroon,
         onRefresh: _load,
@@ -171,43 +170,22 @@ class _BookingListScreenState extends State<BookingListScreen> {
           if (_loading)
             const MfLoadingBox()
           else if (_bookings.isEmpty)
-            MfCard(child: Text('No bookings found', style: AppText.body()))
+            MfEmptyState(
+              title: 'No bookings yet',
+              message: 'Create your first marquee booking.',
+              actionLabel: 'Add New Booking',
+              onAction: () => context.push('/calendar'),
+            )
           else
             ..._bookings.map((raw) {
               final b = raw as Map<String, dynamic>;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: MfCard(
-                  child: InkWell(
-                    onTap: () => context.push('/bookings/${b['id']}'),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: AppColors.goldLight,
-                          child: Text(
-                            (b['customerName'] as String? ?? 'C').substring(0, 1).toUpperCase(),
-                            style: AppText.label().copyWith(color: AppColors.maroon),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(b['customerName'] as String? ?? 'Customer', style: AppText.label()),
-                              Text('${b['eventDate']} · ${b['bookingCode'] ?? b['id']}', style: AppText.body()),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.phone, color: AppColors.maroon),
-                          onPressed: () => launchPhoneCall(b['customerPhone'] as String? ?? ''),
-                        ),
-                        StatusBadge(label: b['paymentStatus'] as String? ?? b['status'] as String? ?? 'pending'),
-                      ],
-                    ),
-                  ),
+                child: MfBookingCard(
+                  booking: b,
+                  onTap: () => context.push('/bookings/${b['id']}'),
+                  onCall: () => launchPhoneCall(b['customerPhone'] as String? ?? ''),
+                  onWhatsApp: () => launchWhatsApp(b['customerPhone'] as String? ?? ''),
                 ),
               );
             }),

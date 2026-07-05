@@ -19,18 +19,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  String? _role;
   bool _remember = true;
   bool _obscure = true;
   bool _loading = false;
   String? _error;
-  List<dynamic> _roles = [];
-
-  @override
-  void initState() {
-    super.initState();
-    widget.api.fetchRoles().then((r) => setState(() => _roles = r)).catchError((_) {});
-  }
 
   @override
   void dispose() {
@@ -51,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await widget.api.login(phone: phone, password: password, role: _role, remember: _remember);
+      await widget.api.login(phone: phone, password: password, remember: _remember);
       if (!mounted) return;
       context.go(await resolveAuthenticatedRoute(widget.api));
     } catch (e) {
@@ -70,28 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           Text('Sign In', style: AppText.display('Sign In', size: 30)),
           const SizedBox(height: 8),
-          Text('Sign in to manage bookings and events.', style: AppText.body()),
+          Text('Sign in with your phone number and password.', style: AppText.body()),
           const SizedBox(height: 24),
-          Text('Role', style: AppText.label()),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _role,
-            decoration: InputDecoration(
-              prefixIcon: const MfFieldIcon('R'),
-              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('Any role')),
-              ..._roles.map(
-                (r) => DropdownMenuItem(
-                  value: r['id'] as String,
-                  child: Text(r['label'] as String? ?? r['id'] as String),
-                ),
-              ),
-            ],
-            onChanged: _loading ? null : (v) => setState(() => _role = v),
-          ),
-          const SizedBox(height: 16),
           MfTextField(
             label: 'Phone number',
             iconLetter: 'P',

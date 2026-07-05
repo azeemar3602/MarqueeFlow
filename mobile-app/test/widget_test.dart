@@ -7,6 +7,6 @@ void main() {
   testWidgets('MarqueeFlow app shell loads', (tester) async {
     await tester.pumpWidget(MarqueeFlowApp(api: MarqueeFlowApi()));
     await tester.pump();
-    expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.text('MarqueeFlow'), findsOneWidget);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -87,7 +88,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_loading) return mfLoadingScreen();
 
-    return MfScreenShell(
+    final totalBookings = _summary?['totalBookings'] as int? ?? 0;
+    final hasBookings = totalBookings > 0 || upcoming.isNotEmpty;
+
+    final content = PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final exit = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Exit MarqueeFlow?'),
+            content: const Text('Do you want to close the app?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
+              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Exit')),
+            ],
+          ),
+        );
+        if (exit == true) SystemNavigator.pop();
+      },
+      child: MfScreenShell(
       title: 'Home Dashboard',
       subtitle: 'Today, upcoming events, and quick actions.',
       notificationCount: _notificationCount,
@@ -156,38 +177,61 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          MfCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Upcoming events', style: AppText.display('Upcoming events', size: 22)),
-                const SizedBox(height: 12),
-                if (upcoming.isEmpty)
-                  Text('No upcoming events', style: AppText.body())
-                else
-                  ...upcoming.map((raw) {
-                    final b = raw as Map<String, dynamic>;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text('${b['customerName']} · ${b['eventDate']}', style: AppText.label()),
-                          ),
-                          StatusBadge(label: b['status'] as String? ?? 'pending'),
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
+          MfQuickActions(
+            actions: [
+              (label: 'Add Booking', icon: Icons.add, onTap: () => context.push('/calendar')),
+              (label: 'View Bookings', icon: Icons.list_alt, onTap: () => context.push('/bookings')),
+              (label: 'Packages', icon: Icons.inventory_2_outlined, onTap: () => context.push('/packages')),
+              (label: 'Payments', icon: Icons.payments_outlined, onTap: () => context.push('/payments')),
+            ],
           ),
+          const SizedBox(height: 16),
+          if (!hasBookings)
+            MfEmptyState(
+              title: 'No bookings yet',
+              message: 'Start by creating your first booking.',
+              actionLabel: 'Add New Booking',
+              onAction: () => context.push('/calendar'),
+            )
+          else
+            MfCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Upcoming events', style: AppText.display('Upcoming events', size: 22)),
+                  const SizedBox(height: 12),
+                  if (upcoming.isEmpty)
+                    Text('No upcoming events scheduled', style: AppText.body())
+                  else
+                    ...upcoming.map((raw) {
+                      final b = raw as Map<String, dynamic>;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: InkWell(
+                          onTap: () => context.push('/bookings/${b['id']}'),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text('${b['customerName']} · ${b['eventDate']}', style: AppText.label()),
+                              ),
+                              StatusBadge(label: b['status'] as String? ?? 'pending'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
           const SizedBox(height: 16),
           MfPrimaryButton(label: 'Add New Booking', icon: Icons.add, onPressed: () => context.push('/calendar')),
           const SizedBox(height: 24),
         ],
         ),
       ),
+      ),
     );
+
+    return content;
   }
 }

@@ -752,7 +752,17 @@ export const db = {
       if (sort === "date") return a.eventDate.localeCompare(b.eventDate);
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
-    return list;
+    return list.map((b) => {
+      const slot = store.slots.find((s) => s.id === b.slotId);
+      const pkg = store.packages.find((p) => p.id === b.packageId);
+      const totalAmount = (b.advancePaid || 0) + (b.remainingAmount || 0);
+      return {
+        ...b,
+        slotName: slot?.slotName,
+        packageName: pkg?.name,
+        totalAmount
+      };
+    });
   },
 
   getBooking(id, businessId) {
@@ -760,7 +770,8 @@ export const db = {
     if (!b) return null;
     const slot = store.slots.find((s) => s.id === b.slotId);
     const pkg = store.packages.find((p) => p.id === b.packageId);
-    return { ...b, slot, package: pkg };
+    const totalAmount = (b.advancePaid || 0) + (b.remainingAmount || 0);
+    return { ...b, slot, package: pkg, slotName: slot?.slotName, packageName: pkg?.name, totalAmount };
   },
 
   updateBooking(id, businessId, patch) {

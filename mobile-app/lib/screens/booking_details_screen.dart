@@ -95,6 +95,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
 
     final slotName = b['slot']?['slotName'] ?? b['slotName'];
+    final paid = b['advancePaid'] as num? ?? 0;
+    final remaining = b['remainingAmount'] as num? ?? 0;
+    final total = b['totalAmount'] as num? ?? (paid + remaining);
 
     return MfScreenShell(
       title: 'Booking Details',
@@ -131,6 +134,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          MfAmountSummary(
+            total: total,
+            paid: paid,
+            remaining: remaining,
+            paymentStatus: b['paymentStatus'] as String?,
+          ),
+          const SizedBox(height: 16),
           MfCard(
             child: Column(
               children: [
@@ -147,15 +157,16 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                     StatusBadge(label: b['paymentStatus'] as String? ?? 'unpaid'),
                   ],
                 ),
-                const SizedBox(height: 8),
-                MfDetailRow('Advance paid', 'PKR ${b['advancePaid'] ?? b['advancePayment'] ?? 0}'),
-                MfDetailRow('Remaining', 'PKR ${b['remainingAmount'] ?? 0}'),
                 if ((b['notes'] as String?)?.isNotEmpty == true) MfDetailRow('Notes', b['notes'] as String?),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          MfPrimaryButton(label: 'Record Payment', icon: Icons.payments_outlined, onPressed: () => context.push('/payments')),
+          MfPrimaryButton(
+            label: 'Record Payment',
+            icon: Icons.payments_outlined,
+            onPressed: remaining > 0 ? () => context.push('/bookings/${widget.bookingId}/record-payment') : null,
+          ),
         ],
       ),
     );

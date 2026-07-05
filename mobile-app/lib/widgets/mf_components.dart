@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'status_badge.dart';
 
 class MfLogo extends StatelessWidget {
   const MfLogo({super.key, this.size = 40});
@@ -106,7 +107,7 @@ class MfScreenShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final shell = Scaffold(
       backgroundColor: AppColors.cream,
       endDrawer: endDrawer,
       body: SafeArea(
@@ -153,6 +154,15 @@ class MfScreenShell extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (onBack == null) return shell;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) onBack!();
+      },
+      child: shell,
     );
   }
 }
@@ -554,6 +564,218 @@ class MfDayChip extends StatelessWidget {
         ),
         child: Text('$day', style: AppText.label().copyWith(color: _fg())),
       ),
+    );
+  }
+}
+
+class MfSectionTitle extends StatelessWidget {
+  const MfSectionTitle(this.text, {super.key, this.subtitle});
+
+  final String text;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: AppText.display(text, size: 22)),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(subtitle!, style: AppText.body()),
+        ],
+      ],
+    );
+  }
+}
+
+class MfEmptyState extends StatelessWidget {
+  const MfEmptyState({
+    super.key,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.icon = Icons.inbox_outlined,
+  });
+
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return MfCard(
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: AppColors.gold),
+          const SizedBox(height: 12),
+          Text(title, style: AppText.display(title, size: 20), textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(message, style: AppText.body(), textAlign: TextAlign.center),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 16),
+            MfPrimaryButton(label: actionLabel!, onPressed: onAction),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class MfAmountSummary extends StatelessWidget {
+  const MfAmountSummary({
+    super.key,
+    required this.total,
+    required this.paid,
+    required this.remaining,
+    this.paymentStatus,
+  });
+
+  final num total;
+  final num paid;
+  final num remaining;
+  final String? paymentStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    return MfCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Payment summary', style: AppText.label()),
+          const SizedBox(height: 12),
+          _row('Package total', 'PKR $total'),
+          _row('Paid', 'PKR $paid'),
+          _row('Remaining', 'PKR $remaining', highlight: true),
+          if (paymentStatus != null) ...[
+            const SizedBox(height: 8),
+            MfBadge(paymentStatus!.replaceAll('_', ' ')),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppText.body()),
+          Text(
+            value,
+            style: highlight
+                ? AppText.display(value, size: 18)
+                : AppText.label(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MfBookingCard extends StatelessWidget {
+  const MfBookingCard({
+    super.key,
+    required this.booking,
+    required this.onTap,
+    this.onCall,
+    this.onWhatsApp,
+  });
+
+  final Map<String, dynamic> booking;
+  final VoidCallback onTap;
+  final VoidCallback? onCall;
+  final VoidCallback? onWhatsApp;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = booking['customerName'] as String? ?? 'Customer';
+    final total = booking['totalAmount'] ?? ((booking['advancePaid'] as num? ?? 0) + (booking['remainingAmount'] as num? ?? 0));
+    return MfCard(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.goldLight,
+                  child: Text(name.substring(0, 1).toUpperCase(), style: AppText.label().copyWith(color: AppColors.maroon)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: AppText.label()),
+                      Text(booking['customerPhone'] as String? ?? '', style: AppText.body()),
+                    ],
+                  ),
+                ),
+                if (onCall != null)
+                  IconButton(icon: const Icon(Icons.phone, color: AppColors.maroon), onPressed: onCall),
+                if (onWhatsApp != null)
+                  IconButton(icon: const Icon(Icons.chat, color: AppColors.maroon), onPressed: onWhatsApp),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${booking['eventDate']} · ${booking['slotName'] ?? 'Slot'} · ${booking['packageName'] ?? 'Package'}',
+              style: AppText.body(),
+            ),
+            Text('Guests: ${booking['guestCount'] ?? '—'}', style: AppText.body()),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: Text('Total PKR $total', style: AppText.label())),
+                Text('Paid PKR ${booking['advancePaid'] ?? 0}', style: AppText.body()),
+                const SizedBox(width: 8),
+                Text('Due PKR ${booking['remainingAmount'] ?? 0}', style: AppText.body().copyWith(color: AppColors.maroon, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                StatusBadge(label: booking['status'] as String? ?? 'pending'),
+                const SizedBox(width: 8),
+                StatusBadge(label: booking['paymentStatus'] as String? ?? 'unpaid'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MfQuickActions extends StatelessWidget {
+  const MfQuickActions({super.key, required this.actions});
+
+  final List<({String label, IconData icon, VoidCallback onTap})> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: actions
+          .map(
+            (a) => ActionChip(
+              avatar: Icon(a.icon, size: 18, color: AppColors.maroon),
+              label: Text(a.label),
+              backgroundColor: AppColors.goldLight.withValues(alpha: 0.35),
+              side: const BorderSide(color: AppColors.gold),
+              onPressed: a.onTap,
+            ),
+          )
+          .toList(),
     );
   }
 }

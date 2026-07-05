@@ -200,35 +200,63 @@ class _CalendarSlotsScreenState extends State<CalendarSlotsScreen> {
                       final slot = raw as Map<String, dynamic>;
                       final status = (slot['status'] as String?)?.toLowerCase() ?? '';
                       final blocked = status == 'blocked';
-                      final full = blocked || status == 'full' ||
-                          (slot['bookedCount'] as num? ?? 0) >= (slot['capacity'] as num? ?? 0);
+                      final booked = slot['bookedCount'] as num? ?? 0;
+                      final capacity = slot['capacity'] as num? ?? 0;
+                      final full = blocked || status == 'full' || booked >= capacity;
+                      final partial = !full && !blocked && booked > 0;
+                      final statusLabel = blocked
+                          ? 'Blocked'
+                          : full
+                              ? 'Fully Booked'
+                              : partial
+                                  ? 'Partially Booked'
+                                  : 'Available';
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: MfCard(
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(slot['slotName'] as String? ?? 'Slot', style: AppText.label()),
                                     Text(
-                                      '${slot['startTime']} - ${slot['endTime']} · ${slot['bookedCount']}/${slot['capacity']} booked',
+                                      slot['slotName'] as String? ?? 'Slot',
+                                      style: AppText.label(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${slot['startTime']} - ${slot['endTime']}',
+                                      style: AppText.body(),
+                                    ),
+                                    Text(
+                                      '${booked}/${capacity} booked · ${capacity - booked} available',
                                       style: AppText.body(),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (full)
-                                MfBadge(blocked ? 'Blocked' : 'Full')
-                              else
-                                SizedBox(
-                                  width: 96,
-                                  child: ElevatedButton(
-                                    onPressed: () => _openBooking(slot),
-                                    child: const Text('Select'),
-                                  ),
-                                ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  MfBadge(statusLabel),
+                                  const SizedBox(height: 8),
+                                  if (full)
+                                    const SizedBox.shrink()
+                                  else
+                                    SizedBox(
+                                      width: 96,
+                                      child: ElevatedButton(
+                                        onPressed: () => _openBooking(slot),
+                                        child: const Text('Select'),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
